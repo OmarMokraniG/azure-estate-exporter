@@ -157,7 +157,7 @@ function Compare-AzureEstateRun {
             [void]$sb.AppendLine('## Modified')
             foreach ($r in $modified) {
                 [void]$sb.AppendLine("- ``$($r.azureId)``")
-                foreach ($p in $r.propertiesChanged) { [void]$sb.AppendLine("    - $p") }
+                foreach ($p in $r.propertiesChanged) { [void]$sb.AppendLine("  - $p") }
             }
             [void]$sb.AppendLine()
         }
