@@ -1,0 +1,19 @@
+{
+  // Markdown lint rules for azure-estate-exporter.
+  // We keep rules that catch real bugs (broken links, duplicate headings, etc.)
+  // but relax pure-style rules that produce noise on technical documentation.
+  "config": {
+    "default": true,
+    "MD013": false,
+    "MD033": false,
+    "MD036": false,
+    "MD041": false,
+    "MD040": false
+  },
+  "ignores": [
+    "node_modules/**",
+    "out/**",
+    "**/out/**",
+    "templates/**"
+  ]
+}
