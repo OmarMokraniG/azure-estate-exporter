@@ -1,4 +1,4 @@
-function Invoke-ArmCollector {
+﻿function Invoke-ArmCollector {
     <#
     .SYNOPSIS
         Supplemental ARM collector — fills gaps that Azure Resource Graph

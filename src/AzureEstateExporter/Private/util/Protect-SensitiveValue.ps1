@@ -1,4 +1,4 @@
-$script:SensitiveKeyPattern = '(?i)(password|secret|connectionstring|clientsecret|key|sas|token|certificate|cert|pwd|apikey)'
+﻿$script:SensitiveKeyPattern = '(?i)(password|secret|connectionstring|clientsecret|key|sas|token|certificate|cert|pwd|apikey)'
 
 function Protect-SensitiveValue {
     <#

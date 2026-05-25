@@ -1,4 +1,4 @@
-function Invoke-ArgCollector {
+﻿function Invoke-ArgCollector {
     <#
     .SYNOPSIS
         Primary inventory collector — queries Azure Resource Graph (ARG).

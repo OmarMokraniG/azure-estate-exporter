@@ -1,4 +1,4 @@
-function Export-AzureEstate {
+﻿function Export-AzureEstate {
     <#
     .SYNOPSIS
         Inventories an Azure scope and produces a Markdown report, diagrams,

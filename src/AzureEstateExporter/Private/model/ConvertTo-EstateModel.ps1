@@ -1,4 +1,4 @@
-function ConvertTo-EstateModel {
+﻿function ConvertTo-EstateModel {
     <#
     .SYNOPSIS
         Normalizes raw collector output into the estate model consumed by every renderer.

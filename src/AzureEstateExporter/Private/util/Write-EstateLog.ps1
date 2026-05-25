@@ -1,4 +1,4 @@
-function Write-EstateLog {
+﻿function Write-EstateLog {
     <#
     .SYNOPSIS
         Structured, level-aware logger used across the module.
@@ -8,6 +8,9 @@ function Write-EstateLog {
         chattiness with normal PowerShell parameters (-Verbose, -InformationAction).
     #>
     [CmdletBinding()]
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute(
+        'PSAvoidUsingWriteHost', '',
+        Justification = 'Coloured progress output is intentional for an interactive CLI tool.')]
     param(
         [Parameter(Mandatory, Position = 0)]
         [string]$Message,
