@@ -1,6 +1,8 @@
-# Coverage matrix (v0.1)
+# Coverage matrix (v0.2)
 
 Be honest with yourself and your customer about what this tool does today.
+The Terraform column reflects what we have **actually observed** `aztfexport`
+v0.19 do during smoke runs, not what the docs claim.
 
 ## Legend
 
@@ -64,3 +66,17 @@ If you find a resource type that's wrong above, please open an issue with:
 1. The exact `type` string from `inventory.json`.
 2. Which column (Inventory / Diagram / Terraform) is wrong.
 3. Output of `aztfexport --version` if Terraform is involved.
+
+## Tested in CI / locally
+
+- `Microsoft.Web/sites`, `Microsoft.Web/serverFarms`
+- `Microsoft.Storage/storageAccounts`
+- `Microsoft.KeyVault/vaults`
+- `Microsoft.Insights/components`
+- `Microsoft.EventGrid/topics`
+- `Microsoft.Network/networkInterfaces`, `Microsoft.Network/virtualNetworks`
+- `Microsoft.Compute/virtualMachines`
+
+Everything else inherits from `aztfexport`'s mapping table. When a resource is
+skipped, you will find it under `unsupportedResources` in the per-RG
+`tf-report.json` so you can grep across runs.

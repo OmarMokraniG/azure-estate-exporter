@@ -49,7 +49,15 @@ function New-MermaidDiagram {
 
     foreach ($e in $Model.Graph.edges) {
         if (-not $idMap.ContainsKey($e.from) -or -not $idMap.ContainsKey($e.to)) { continue }
-        [void]$sb.AppendLine("  $($idMap[$e.from]) --> $($idMap[$e.to])")
+        # Prefer the v0.2 `relation` field; fall back to v0.1's `kind` for older inputs.
+        $rel = if ($e.PSObject.Properties['relation']) { $e.relation } else { $e.kind }
+        if ($rel -and $rel -ne 'reference' -and $rel -ne 'references') {
+            # Escape pipe character which is significant in Mermaid edge labels.
+            $safeRel = ($rel -replace '\|', '/')
+            [void]$sb.AppendLine("  $($idMap[$e.from]) -->|$safeRel| $($idMap[$e.to])")
+        } else {
+            [void]$sb.AppendLine("  $($idMap[$e.from]) --> $($idMap[$e.to])")
+        }
     }
 
     [void]$sb.AppendLine('```')

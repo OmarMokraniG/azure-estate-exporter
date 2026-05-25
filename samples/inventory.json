@@ -1,0 +1,70 @@
+[
+  {
+    "id": "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-contoso-web/providers/Microsoft.Web/sites/contoso-app",
+    "name": "contoso-app",
+    "type": "microsoft.web/sites",
+    "kind": "app,linux",
+    "location": "westeurope",
+    "resourceGroup": "rg-contoso-web",
+    "subscriptionId": "00000000-0000-0000-0000-000000000001",
+    "managedBy": null,
+    "tags": { "env": "demo", "owner": "contoso" },
+    "sku": { "name": "P1v3", "tier": "PremiumV3" },
+    "identityType": "SystemAssigned",
+    "properties": {
+      "serverFarmId": "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-contoso-web/providers/Microsoft.Web/serverFarms/contoso-plan"
+    }
+  },
+  {
+    "id": "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-contoso-web/providers/Microsoft.Web/serverFarms/contoso-plan",
+    "name": "contoso-plan",
+    "type": "microsoft.web/serverfarms",
+    "kind": "linux",
+    "location": "westeurope",
+    "resourceGroup": "rg-contoso-web",
+    "subscriptionId": "00000000-0000-0000-0000-000000000001",
+    "tags": { "env": "demo" },
+    "sku": { "name": "P1v3", "tier": "PremiumV3" },
+    "identityType": null,
+    "properties": {}
+  },
+  {
+    "id": "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-contoso-web/providers/Microsoft.Storage/storageAccounts/contosostor01",
+    "name": "contosostor01",
+    "type": "microsoft.storage/storageaccounts",
+    "kind": "StorageV2",
+    "location": "westeurope",
+    "resourceGroup": "rg-contoso-web",
+    "subscriptionId": "00000000-0000-0000-0000-000000000001",
+    "tags": { "env": "demo" },
+    "sku": { "name": "Standard_LRS", "tier": "Standard" },
+    "identityType": null,
+    "properties": {}
+  },
+  {
+    "id": "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-contoso-web/providers/Microsoft.KeyVault/vaults/contoso-kv",
+    "name": "contoso-kv",
+    "type": "microsoft.keyvault/vaults",
+    "kind": null,
+    "location": "westeurope",
+    "resourceGroup": "rg-contoso-web",
+    "subscriptionId": "00000000-0000-0000-0000-000000000001",
+    "tags": { "env": "demo" },
+    "sku": { "name": "standard", "family": "A" },
+    "identityType": null,
+    "properties": {}
+  },
+  {
+    "id": "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-contoso-web/providers/Microsoft.Insights/components/contoso-ai",
+    "name": "contoso-ai",
+    "type": "microsoft.insights/components",
+    "kind": "web",
+    "location": "westeurope",
+    "resourceGroup": "rg-contoso-web",
+    "subscriptionId": "00000000-0000-0000-0000-000000000001",
+    "tags": { "env": "demo" },
+    "sku": null,
+    "identityType": null,
+    "properties": {}
+  }
+]

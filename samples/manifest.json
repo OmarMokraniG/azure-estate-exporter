@@ -1,0 +1,36 @@
+{
+  "generator": {
+    "name": "azure-estate-exporter",
+    "version": "0.2.0",
+    "generatedAt": "2026-05-25T17:00:00+02:00"
+  },
+  "scope": {
+    "kind": "ResourceGroup",
+    "subscriptionIds": ["00000000-0000-0000-0000-000000000001"],
+    "resourceGroup": "rg-contoso-web",
+    "tenantId": "00000000-0000-0000-0000-000000000099"
+  },
+  "collection": {
+    "subscriptionsQueried": 1,
+    "resourceCount": 5,
+    "edgeCount": 1,
+    "redactionEnabled": true
+  },
+  "tools": {
+    "az": "azure-cli 2.84.0",
+    "aztfexport": "aztfexport v0.19.0",
+    "terraform": "Terraform v1.11.3",
+    "pwsh": "7.5.0"
+  },
+  "errorsByArea": {
+    "arm": 0,
+    "terraform": 0
+  },
+  "resources": [
+    { "azureId": "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-contoso-web/providers/Microsoft.Web/sites/contoso-app", "tfAddress": "sites.contoso_app", "rgFolder": "terraform/00000000-0000-0000-0000-000000000001/rg-contoso-web", "hash": "sha256:0000000000000000000000000000000000000000000000000000000000000001" },
+    { "azureId": "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-contoso-web/providers/Microsoft.Web/serverFarms/contoso-plan", "tfAddress": "serverfarms.contoso_plan", "rgFolder": "terraform/00000000-0000-0000-0000-000000000001/rg-contoso-web", "hash": "sha256:0000000000000000000000000000000000000000000000000000000000000002" },
+    { "azureId": "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-contoso-web/providers/Microsoft.Storage/storageAccounts/contosostor01", "tfAddress": "storageaccounts.contosostor01", "rgFolder": "terraform/00000000-0000-0000-0000-000000000001/rg-contoso-web", "hash": "sha256:0000000000000000000000000000000000000000000000000000000000000003" },
+    { "azureId": "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-contoso-web/providers/Microsoft.KeyVault/vaults/contoso-kv", "tfAddress": "vaults.contoso_kv", "rgFolder": "terraform/00000000-0000-0000-0000-000000000001/rg-contoso-web", "hash": "sha256:0000000000000000000000000000000000000000000000000000000000000004" },
+    { "azureId": "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-contoso-web/providers/Microsoft.Insights/components/contoso-ai", "tfAddress": "components.contoso_ai", "rgFolder": "terraform/00000000-0000-0000-0000-000000000001/rg-contoso-web", "hash": "sha256:0000000000000000000000000000000000000000000000000000000000000005" }
+  ]
+}

@@ -150,7 +150,6 @@
     if ($PSCmdlet.ShouldProcess("$runRoot/inventory.json", 'Write inventory')) {
         $safeModel.Inventory | ConvertTo-Json -Depth 32 | Set-Content "$runRoot/inventory.json" -Encoding utf8
         $safeModel.Graph     | ConvertTo-Json -Depth 32 | Set-Content "$runRoot/graph.json"     -Encoding utf8
-        $safeModel.Manifest  | ConvertTo-Json -Depth 32 | Set-Content "$runRoot/manifest.json"  -Encoding utf8
     }
 
     # --- 7. Renderers ---------------------------------------------------------
@@ -178,7 +177,63 @@
         Invoke-TerraformExport -Model $safeModel -OutputRoot "$runRoot/terraform" -WithImport:$WithImport -Errors $errors
     }
 
-    # --- 8. Errors + index -----------------------------------------------------
+    # --- 8. Collection confidence (manifest meta) ----------------------------
+    # We fill this AFTER renderers so errorsByArea reflects everything we tried.
+    $moduleVersion = (Get-Module AzureEstateExporter | Select-Object -First 1).Version.ToString()
+    function Get-ToolVersion([string]$exe, [string]$arg = '--version') {
+        $cmd = Get-Command $exe -ErrorAction SilentlyContinue
+        if (-not $cmd) { return $null }
+        try {
+            # `az version` returns JSON; everything else returns a one-liner first.
+            if ($exe -eq 'az') {
+                $j = & $exe version --output json 2>$null | ConvertFrom-Json
+                if ($j -and $j.'azure-cli') { return "azure-cli $($j.'azure-cli')" }
+            }
+            $raw = & $exe $arg 2>&1 | Select-Object -First 1
+            return (("$raw") -replace '\s+', ' ').Trim()
+        } catch { return $null }
+    }
+    $errorsByArea = @{}
+    foreach ($e in $errors) {
+        $area = if ($e.area) { $e.area } else { 'unknown' }
+        if ($errorsByArea.ContainsKey($area)) { $errorsByArea[$area]++ } else { $errorsByArea[$area] = 1 }
+    }
+
+    $safeModel.Manifest.generator = [pscustomobject]@{
+        name        = 'azure-estate-exporter'
+        version     = $moduleVersion
+        generatedAt = (Get-Date -Format 'o')
+    }
+    $safeModel.Manifest.scope = [pscustomobject]@{
+        kind            = $PSCmdlet.ParameterSetName
+        subscriptionIds = $subIds
+        resourceGroup   = $rgFilter
+        tenantId        = if ($PSCmdlet.ParameterSetName -eq 'Tenant') { $TenantId } else { $account.tenantId }
+    }
+    $safeModel.Manifest.collection = [pscustomobject]@{
+        subscriptionsQueried = $subIds.Count
+        resourceCount        = $safeModel.Inventory.Count
+        edgeCount            = @($safeModel.Graph.edges).Count
+        redactionEnabled     = (-not $NoRedact.IsPresent)
+    }
+    $safeModel.Manifest.tools = [pscustomobject]@{
+        az         = (Get-ToolVersion 'az' 'version')
+        aztfexport = (Get-ToolVersion 'aztfexport' '--version')
+        terraform  = (Get-ToolVersion 'terraform' '-version')
+        pwsh       = $PSVersionTable.PSVersion.ToString()
+    }
+    $safeModel.Manifest.errorsByArea = [pscustomobject]$errorsByArea
+
+    if ($PSCmdlet.ShouldProcess("$runRoot/manifest.json", 'Write manifest')) {
+        $safeModel.Manifest | ConvertTo-Json -Depth 32 | Set-Content "$runRoot/manifest.json" -Encoding utf8
+    }
+
+    # --- 9. HTML dashboard (always when diagrams ran; cheap + headline artifact) --
+    if ($doDiagram -or $doReport) {
+        New-HtmlDashboard -Model $safeModel -OutputPath "$runRoot/index.html"
+    }
+
+    # --- 10. Errors + index ---------------------------------------------------
     if ($PSCmdlet.ShouldProcess("$runRoot/errors.json", 'Write errors')) {
         $errors.ToArray() | ConvertTo-Json -Depth 16 | Set-Content "$runRoot/errors.json" -Encoding utf8
     }
@@ -186,9 +241,10 @@
     $index = @"
 # Azure estate export — $stamp
 
+- **Dashboard:** [``index.html``](index.html)
 - Inventory: [``inventory.json``](inventory.json) ($($safeModel.Inventory.Count) resources)
 - Graph: [``graph.json``](graph.json)
-- Manifest (azure-id -> tf-address): [``manifest.json``](manifest.json)
+- Manifest (azure-id -> tf-address + collection confidence): [``manifest.json``](manifest.json)
 - Errors: [``errors.json``](errors.json) ($($errors.Count))
 - Report: [``report/report.md``](report/report.md)
 - Diagrams: [``diagrams/``](diagrams/)

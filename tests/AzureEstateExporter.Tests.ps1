@@ -7,16 +7,18 @@ BeforeAll {
 }
 
 Describe 'Module surface' {
-    It 'exports only Export-AzureEstate' {
+    It 'exports public functions' {
         $exports = (Get-Module AzureEstateExporter).ExportedFunctions.Keys
         $exports | Should -Contain 'Export-AzureEstate'
-        $exports.Count | Should -Be 1
+        $exports | Should -Contain 'Compare-AzureEstateRun'
     }
 
     It 'has comment-based help' {
         $h = Get-Help Export-AzureEstate -Full
         $h.Synopsis | Should -Not -BeNullOrEmpty
         $h.Description | Should -Not -BeNullOrEmpty
+        $h2 = Get-Help Compare-AzureEstateRun -Full
+        $h2.Synopsis | Should -Not -BeNullOrEmpty
     }
 }
 
@@ -91,7 +93,15 @@ Describe 'ConvertTo-EstateModel' {
         $model.Inventory.Count | Should -Be 2
         $model.Graph.nodes.Count | Should -Be 2
         $model.Graph.edges | Should -Not -BeNullOrEmpty
-        $model.Manifest.Count | Should -Be 2
-        ($model.Manifest | Where-Object { $_.azureId -eq $vmId }).tfAddress | Should -Match 'virtualmachines.vm1'
+        # v0.2 manifest is a pscustomobject with a .resources array.
+        $model.Manifest.resources.Count | Should -Be 2
+        ($model.Manifest.resources | Where-Object { $_.azureId -eq $vmId }).tfAddress | Should -Match 'virtualmachines.vm1'
+        # v0.2 schema: edges carry a relation + sourceProperty path.
+        $edge = $model.Graph.edges | Select-Object -First 1
+        $edge.PSObject.Properties.Name | Should -Contain 'relation'
+        $edge.PSObject.Properties.Name | Should -Contain 'sourceProperty'
+        $edge.relation | Should -Not -BeNullOrEmpty
+        # Per-resource hash is stable + sha256.
+        ($model.Manifest.resources | Select-Object -First 1).hash | Should -Match '^sha256:[0-9a-f]{64}$'
     }
 }

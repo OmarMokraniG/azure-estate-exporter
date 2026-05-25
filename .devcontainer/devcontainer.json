@@ -1,0 +1,29 @@
+{
+  "name": "azure-estate-exporter",
+  "image": "mcr.microsoft.com/devcontainers/universal:2",
+  "features": {
+    "ghcr.io/devcontainers/features/azure-cli:1": { "version": "latest" },
+    "ghcr.io/devcontainers/features/terraform:1": { "version": "latest" },
+    "ghcr.io/devcontainers/features/powershell:1": { "version": "latest" },
+    "ghcr.io/devcontainers/features/github-cli:1": { "version": "latest" }
+  },
+  "postCreateCommand": "pwsh -NoProfile -Command \"Install-Module -Name Pester,PSScriptAnalyzer -Force -SkipPublisherCheck -Scope CurrentUser\" && curl -sSL https://github.com/Azure/aztfexport/releases/latest/download/aztfexport_$(uname -s)_amd64 -o /tmp/aztfexport && install -m 0755 /tmp/aztfexport /usr/local/bin/aztfexport || echo 'aztfexport install best-effort; install manually if missing.'",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-vscode.PowerShell",
+        "ms-azuretools.vscode-azureterraform",
+        "hashicorp.terraform",
+        "bierner.markdown-mermaid",
+        "github.vscode-pull-request-github",
+        "github.copilot",
+        "github.copilot-chat"
+      ],
+      "settings": {
+        "powershell.codeFormatting.preset": "OTBS",
+        "files.eol": "\n"
+      }
+    }
+  },
+  "remoteUser": "codespace"
+}

@@ -1,6 +1,6 @@
 @{
     RootModule        = 'AzureEstateExporter.psm1'
-    ModuleVersion     = '0.1.0'
+    ModuleVersion     = '0.2.0'
     GUID              = 'a4f4f6c8-3b3a-4b5a-9f4c-1d2e3f4a5b6c'
     Author            = 'Omar Mokrani and contributors'
     CompanyName       = 'Community'
@@ -9,7 +9,8 @@
     PowerShellVersion = '7.2'
 
     FunctionsToExport = @(
-        'Export-AzureEstate'
+        'Export-AzureEstate',
+        'Compare-AzureEstateRun'
     )
     CmdletsToExport   = @()
     AliasesToExport   = @()
