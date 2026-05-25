@@ -1,0 +1,27 @@
+# Heredoc-style template for the Markdown report (reference only).
+# The actual renderer (Private/renderers/New-MarkdownReport.ps1) generates the
+# document programmatically; this file documents the intended structure.
+
+# Azure Estate Report
+
+_Generated {{TIMESTAMP}} by azure-estate-exporter._
+
+## Summary
+
+- Subscriptions: **{{SUB_COUNT}}**
+- Resource groups: **{{RG_COUNT}}**
+- Resources: **{{RES_COUNT}}**
+
+### Top resource types
+
+| Type | Count |
+|------|------:|
+| {{TYPE}} | {{N}} |
+
+## Subscription `{{SUB_ID}}`
+
+### Resource group `{{RG_NAME}}`
+
+| Name | Type | Location | Tags |
+|------|------|----------|------|
+| [`{{RES_NAME}}`]({{PORTAL_URL}}) | {{RES_TYPE}} | {{LOCATION}} | {{TAGS}} |

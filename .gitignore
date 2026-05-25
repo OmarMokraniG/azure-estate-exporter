@@ -1,0 +1,40 @@
+# Output of the exporter — may contain sensitive resource metadata
+out/
+output/
+*.estate-out/
+
+# Terraform
+*.tfstate
+*.tfstate.*
+*.tfstate.backup
+*.tfvars
+!*.tfvars.example
+.terraform/
+.terraform.lock.hcl
+crash.log
+crash.*.log
+
+# Azure / az CLI
+.azure/
+azureProfile.json
+*.publishsettings
+
+# PowerShell test/build artifacts
+*.nupkg
+coverage.xml
+TestResults.xml
+PSScriptAnalyzerReport.txt
+*.pssproj.user
+
+# Node (Excalidraw helpers if any)
+node_modules/
+npm-debug.log*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
