@@ -50,11 +50,23 @@ Write-Host "  appId: $appId" -ForegroundColor Green
 
 # Configure the SPA platform with our redirect URIs (az CLI doesn't expose this
 # cleanly, so we PATCH via the Microsoft Graph endpoint).
+#
+# NOTE: on Windows PowerShell, `az rest --body '<inline JSON>'` strips the
+# Content-Type header and the Graph API rejects the payload as malformed.
+# Writing the body to a temp file and referencing it with `@path` avoids
+# the issue on all platforms.
 $spa = @{ spa = @{ redirectUris = $redirects } } | ConvertTo-Json -Compress -Depth 5
-az rest --method PATCH `
-    --uri "https://graph.microsoft.com/v1.0/applications/$($created.id)" `
-    --headers 'Content-Type=application/json' `
-    --body $spa | Out-Null
+$bodyFile = New-TemporaryFile
+try {
+    Set-Content -Path $bodyFile.FullName -Value $spa -Encoding ascii -NoNewline
+    az rest --method PATCH `
+        --uri "https://graph.microsoft.com/v1.0/applications/$($created.id)" `
+        --headers 'Content-Type=application/json' `
+        --body "@$($bodyFile.FullName)" | Out-Null
+}
+finally {
+    Remove-Item -Path $bodyFile.FullName -ErrorAction SilentlyContinue
+}
 Write-Host "  redirect URIs: $($redirects -join ', ')" -ForegroundColor Green
 
 # Add delegated permission: Azure Service Management → user_impersonation
