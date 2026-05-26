@@ -14,4 +14,4 @@ Get-ChildItem -Path $privateRoot -Recurse -Filter '*.ps1' -File |
 Get-ChildItem -Path $publicRoot -Filter '*.ps1' -File |
     ForEach-Object { . $_.FullName }
 
-Export-ModuleMember -Function 'Export-AzureEstate', 'Compare-AzureEstateRun'
+Export-ModuleMember -Function 'Export-AzureEstate', 'Compare-AzureEstateRun', 'New-AzureEstateTerraformRepo'

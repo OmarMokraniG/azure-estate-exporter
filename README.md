@@ -57,12 +57,47 @@ out/2026-05-25T13-00-00/
 ├── diagrams/
 │   ├── estate.mmd         # Mermaid (default)
 │   └── estate.excalidraw  # Excalidraw (if -Diagram Excalidraw|Both)
-└── terraform/
-    └── <sub>/<rg-name>/   # one HCL folder per resource group
-        ├── main.tf
-        ├── providers.tf
-        ├── tf-report.json # what was exported / unsupported, plus tool version
-        └── ...
+├── terraform/
+│   └── <sub>/<rg-name>/   # raw aztfexport output, one HCL folder per resource group
+│       ├── main.tf
+│       ├── provider.tf
+│       └── ...
+└── terraform-repo/        # ⭐ NEW in v0.3.1 — deployable Terraform baseline repo
+    ├── README.md          # how to use; baseline-not-clone warnings
+    ├── .gitignore
+    ├── backend.tf.example # Azure Storage backend stub
+    ├── docs/
+    │   └── coverage.md    # aggregated skipped resources across all RGs
+    └── infra/
+        └── <rg-name>/     # self-contained Terraform working dir
+            ├── main.tf
+            ├── provider.tf            # subscription_id = var.subscription_id
+            ├── variables.tf
+            ├── terraform.tfvars.example
+            ├── bootstrap-import.ps1   # imports every resource into state
+            ├── imports.md             # raw `terraform import` list (bash users)
+            └── README.md
+```
+
+### Deploy the generated baseline
+
+```powershell
+cd out/<timestamp>/terraform-repo/infra/<rg>
+Copy-Item terraform.tfvars.example terraform.tfvars  # edit subscription_id
+terraform init
+./bootstrap-import.ps1 -WhatIf   # dry run
+./bootstrap-import.ps1           # imports every resource into local state
+terraform plan                   # should say: No changes.
+```
+
+The generated repo is a **baseline, not a perfect clone**. `aztfexport`
+does not capture secrets, data-plane contents, runtime config, or
+unsupported resource types — see `docs/coverage.md` inside the generated
+repo. You can also repackage any existing export without re-running
+`aztfexport`:
+
+```powershell
+New-AzureEstateTerraformRepo -InputPath ./out/<timestamp> -InitGit -Force
 ```
 
 ## Diff two runs
