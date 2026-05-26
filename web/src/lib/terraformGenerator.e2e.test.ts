@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import { readFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { generateTerraformRepo, isFullySupported } from './terraformGenerator';
@@ -10,9 +10,15 @@ import type { ArgResource } from '@/api/arm';
  * checked-in real inventory file — keeps the regular `npm test` reproducible.
  */
 const realInventory = resolve(__dirname, '../../../out/2026-05-26T16-58-45/inventory.json');
+const hasFixture = existsSync(realInventory);
 
-describe.skipIf(!existsSync(realInventory))('generator e2e against real ARG inventory', () => {
-  const resources = JSON.parse(readFileSync(realInventory, 'utf8')) as ArgResource[];
+describe.skipIf(!hasFixture)('generator e2e against real ARG inventory', () => {
+  let resources: ArgResource[] = [];
+
+  beforeAll(() => {
+    // Read inside beforeAll so a missing file does not blow up import time.
+    resources = JSON.parse(readFileSync(realInventory, 'utf8')) as ArgResource[];
+  });
 
   it('produces the expected file tree with no exceptions', () => {
     const files = generateTerraformRepo({
@@ -31,7 +37,6 @@ describe.skipIf(!existsSync(realInventory))('generator e2e against real ARG inve
       subscriptionId: 'e8941ee9-a543-4f66-9d42-5c28612e9fe0',
       resources,
     });
-    // Every input resource must produce SOMETHING (an HCL block OR a # stub).
     const mainTf = files.find((f) => f.path === 'infra/rg-mhsql-dev-7o5cp/main.tf')!.content;
     for (const r of resources) {
       expect(
