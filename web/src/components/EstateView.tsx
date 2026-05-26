@@ -74,7 +74,7 @@ export function EstateView({ onChangeScope }: { onChangeScope: () => void }) {
           )}
           {tab === 'diagram' && <DiagramTab resources={resources.data ?? []} loading={resources.isLoading} />}
           {tab === 'resources' && <ResourcesTab resources={resources.data ?? []} />}
-          {tab === 'terraform' && <TerraformTab />}
+          {tab === 'terraform' && <TerraformTab resources={resources.data ?? []} />}
         </div>
       </div>
 

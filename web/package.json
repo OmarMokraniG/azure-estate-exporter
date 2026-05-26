@@ -1,7 +1,7 @@
 {
   "name": "azure-estate-exporter-web",
   "private": true,
-  "version": "0.3.0",
+  "version": "0.4.1",
   "type": "module",
   "description": "Visual web companion for azure-estate-exporter. Sign in with Entra, browse subscriptions/RGs, see an interactive Azure resource map and grab a Terraform CLI handoff.",
   "scripts": {
@@ -9,6 +9,7 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "lint": "eslint . --max-warnings 0",
+    "test": "vitest run",
     "fetch-icons": "node scripts/fetch-icons.mjs"
   },
   "dependencies": {
@@ -18,18 +19,21 @@
     "@tanstack/react-table": "^8.20.0",
     "@xyflow/react": "^12.3.0",
     "dagre": "^0.8.5",
+    "jszip": "^3.10.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "zustand": "^4.5.4"
   },
   "devDependencies": {
     "@types/dagre": "^0.7.52",
+    "@types/jszip": "^3.4.1",
     "@types/node": "^20.14.10",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "@typescript-eslint/eslint-plugin": "^7.16.1",
     "@typescript-eslint/parser": "^7.16.1",
     "@vitejs/plugin-react": "^4.3.1",
+    "@vitest/coverage-v8": "^4.1.7",
     "autoprefixer": "^10.4.19",
     "eslint": "^8.57.0",
     "eslint-plugin-react-hooks": "^4.6.2",
@@ -37,6 +41,7 @@
     "postcss": "^8.4.39",
     "tailwindcss": "^3.4.6",
     "typescript": "^5.5.3",
-    "vite": "^5.3.3"
+    "vite": "^5.3.3",
+    "vitest": "^4.1.7"
   }
 }

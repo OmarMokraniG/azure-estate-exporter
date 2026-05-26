@@ -3,6 +3,39 @@
 All notable changes to `azure-estate-exporter` are documented here.
 Format roughly follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.4.1] — 2026-05-26
+
+### Added
+
+- **Web app Terraform tab now renders the full repo in-browser** — no longer
+  just a copy-paste CLI handoff. From the SPA you get:
+  - A file tree with `README.md`, `.gitignore`, `backend.tf.example`, and
+    `infra/<rg>/{main.tf, provider.tf, variables.tf, terraform.tfvars.example,
+    outputs.tf, README.md}` for every resource group in scope.
+  - A live HCL viewer (line numbers + Copy button) showing the selected file.
+  - **Download .zip** button — bundles the entire generated repo via JSZip
+    so you can `unzip ; terraform init ; terraform plan` immediately.
+  - Coverage banner: shows what % of resources have native HCL renderers.
+- **Browser-side HCL generator** (`web/src/lib/terraformGenerator.ts`) covers
+  the ~15 most common resource types (RG, Storage, VNet/Subnet, NIC, NSG,
+  Public IP, Route Table, VM linux/windows, Managed Disk, Key Vault, Service
+  Plan, App Service linux/windows, Log Analytics, App Insights). Unsupported
+  types emit honest commented stubs that point users at the PowerShell module.
+- The previous copy-paste CLI handoff is preserved behind a "Show CLI handoff"
+  toggle — production-grade `aztfexport` flow stays one click away.
+- **Vitest** added to the web project. `npm test` runs 13 tests covering the
+  generator (sanitiser, file structure, HCL content, subnet ref resolution,
+  unsupported-type stubs, idempotency vs real ARG inventory).
+- Generator is **failure-tolerant** — a single mis-shaped ARG resource never
+  breaks the whole repo; it gets an honest `# Renderer error on …` stub.
+
+### Honesty
+
+The in-browser repo is a fast **baseline**. The PowerShell module +
+`aztfexport` remain the production path because they import resources into
+Terraform state so `terraform plan` shows _No changes_. The web tab explicitly
+links to that flow.
+
 ## [0.4.0] — 2026-05-26
 
 ### Added

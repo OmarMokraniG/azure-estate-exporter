@@ -33,6 +33,9 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Unit tests (Vitest)
+        run: npm test -- --reporter=verbose
+
       - name: Build
         env:
           # Stub client id so MSAL initialisation in `msalConfig.ts` does not
