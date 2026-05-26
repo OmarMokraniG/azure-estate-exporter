@@ -1,0 +1,13 @@
+node_modules
+dist
+dist-ssr
+*.local
+.vite
+.env
+.env.local
+.env.*.local
+*.tsbuildinfo
+
+# Optional Azure icons fetched by scripts/fetch-icons.mjs.
+# These are NOT bundled in the repo (see scripts/fetch-icons.mjs for license terms).
+public/icons/azure-official/

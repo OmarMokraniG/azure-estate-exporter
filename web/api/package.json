@@ -1,0 +1,9 @@
+{
+  "name": "azure-estate-exporter-arm-proxy",
+  "version": "0.3.0",
+  "private": true,
+  "type": "commonjs",
+  "dependencies": {
+    "@azure/functions": "^4.5.0"
+  }
+}

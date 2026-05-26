@@ -80,6 +80,35 @@ across to avoid leaking what redaction was supposed to hide.
 The [`samples/`](samples/) folder contains anonymized output you can use to test
 renderers, write downstream tooling or demo the project offline.
 
+## 🌐 Web UI (v0.3, preview)
+
+Prefer clicking to scripting? The [`web/`](web/) folder contains a Vite + React
+SPA that lets you sign in with Entra, browse subscriptions and resource groups,
+and explore your estate visually:
+
+- interactive **resource map** (React Flow + heuristic edges + Azure-style category icons)
+- sortable, filterable **resource table** with a JSON side panel
+- one-click **Terraform CLI handoff** that runs the PowerShell module locally
+
+```powershell
+# 1. Create your own Entra app registration (one-off, in your tenant)
+pwsh -File scripts/create-app-reg.ps1
+
+# 2. Configure the web app
+cd web
+cp .env.example .env.local
+#    paste the printed appId into VITE_AZURE_CLIENT_ID
+
+# 3. Run it
+npm install
+npm run dev
+#    open http://localhost:5173
+```
+
+See [`web/README.md`](web/README.md) for deployment to Azure Static Web Apps and
+notes on Microsoft's Azure architecture icons (we ship generic open-source
+placeholders; the official icons are an opt-in download).
+
 ## Features (v0.2)
 
 - ✅ **Resource Graph–based** discovery across one subscription or all subscriptions visible to your identity.
