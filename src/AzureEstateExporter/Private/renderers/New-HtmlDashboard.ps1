@@ -142,6 +142,104 @@
 "@
     }
 
+    # --- v0.4.0 customer-grade cards + sections -----------------------------
+    $customerCards = New-Object System.Text.StringBuilder
+    $customerSections = New-Object System.Text.StringBuilder
+
+    if ($Model.Cost -and $Model.Cost.Totals.Count -gt 0) {
+        $totalCost = ($Model.Cost.Totals | Measure-Object cost -Sum).Sum
+        $cur = $Model.Cost.Totals[0].currency
+        [void]$customerCards.AppendLine("    <div class='card'><div class='v'>$([math]::Round($totalCost,2)) $cur</div><div class='l'>$($Model.Cost.Timeframe) cost</div></div>")
+
+        $costRows = New-Object System.Text.StringBuilder
+        foreach ($r in $Model.Cost.ByService | Sort-Object cost -Descending | Select-Object -First 10) {
+            [void]$costRows.AppendLine("<tr><td>$(ConvertTo-HtmlText $r.serviceName)</td><td class='num'>$($r.cost) $($r.currency)</td></tr>")
+        }
+        $costRgRows = New-Object System.Text.StringBuilder
+        foreach ($r in $Model.Cost.ByResourceGroup | Sort-Object cost -Descending | Select-Object -First 10) {
+            [void]$costRgRows.AppendLine("<tr><td><code>$(ConvertTo-HtmlText $r.resourceGroup)</code></td><td class='num'>$($r.cost) $($r.currency)</td></tr>")
+        }
+        [void]$customerSections.AppendLine(@"
+<section>
+  <h2>Cost (Microsoft Cost Management — $($Model.Cost.Timeframe))</h2>
+  <div class="columns2">
+    <div><h3>Top services</h3><table><thead><tr><th>Service</th><th class='num'>Cost</th></tr></thead><tbody>$($costRows.ToString())</tbody></table></div>
+    <div><h3>Top resource groups</h3><table><thead><tr><th>RG</th><th class='num'>Cost</th></tr></thead><tbody>$($costRgRows.ToString())</tbody></table></div>
+  </div>
+</section>
+"@)
+    }
+
+    if ($Model.Security -and $Model.Security.SecureScores.Count -gt 0) {
+        $avgPct = [math]::Round(($Model.Security.SecureScores | Measure-Object percentage -Average).Average, 1)
+        [void]$customerCards.AppendLine("    <div class='card'><div class='v'>$avgPct%</div><div class='l'>Secure score</div></div>")
+        $secRows = New-Object System.Text.StringBuilder
+        foreach ($a in $Model.Security.Assessments | Select-Object -First 15) {
+            $resName = if ($a.resourceId) { ($a.resourceId -split '/')[-1] } else { '(subscription scope)' }
+            $sevClass = "sev-$($a.severity)".ToLower()
+            [void]$secRows.AppendLine("<tr><td><span class='pill $sevClass'>$(ConvertTo-HtmlText $a.severity)</span></td><td>$(ConvertTo-HtmlText $a.displayName)</td><td><code>$(ConvertTo-HtmlText $resName)</code></td></tr>")
+        }
+        if ($secRows.Length -gt 0) {
+            [void]$customerSections.AppendLine(@"
+<section>
+  <h2>Security (Microsoft Defender for Cloud)</h2>
+  <table><thead><tr><th>Severity</th><th>Assessment</th><th>Resource</th></tr></thead><tbody>$($secRows.ToString())</tbody></table>
+</section>
+"@)
+        }
+    }
+
+    if ($Model.Policy -and $Model.Policy.Headline) {
+        $h = $Model.Policy.Headline
+        $colour = if ($h.compliancePercent -ge 90) { 'accent' } elseif ($h.compliancePercent -ge 70) { 'warn' } else { 'crit' }
+        [void]$customerCards.AppendLine("    <div class='card $colour'><div class='v'>$($h.compliancePercent)%</div><div class='l'>Policy compliance</div></div>")
+        if ($Model.Policy.ByAssignment.Count -gt 0) {
+            $polRows = New-Object System.Text.StringBuilder
+            foreach ($a in $Model.Policy.ByAssignment | Select-Object -First 10) {
+                [void]$polRows.AppendLine("<tr><td><code>$(ConvertTo-HtmlText $a.assignmentName)</code></td><td><code>$(ConvertTo-HtmlText $a.policyDefinitionName)</code></td><td class='num'>$($a.nonCompliantCount)</td></tr>")
+            }
+            [void]$customerSections.AppendLine(@"
+<section>
+  <h2>Policy compliance</h2>
+  <p><strong>$($h.nonCompliantResources)</strong> non-compliant policy states out of <strong>$($h.totalResources)</strong>.</p>
+  <table><thead><tr><th>Assignment</th><th>Definition</th><th class='num'>Non-compliant</th></tr></thead><tbody>$($polRows.ToString())</tbody></table>
+</section>
+"@)
+        }
+    }
+
+    if ($Model.Exposure -and $Model.Exposure.Count -gt 0) {
+        $highCount = @($Model.Exposure | Where-Object { $_.severity -eq 'High' }).Count
+        $cardColour = if ($highCount -gt 0) { 'crit' } else { 'warn' }
+        [void]$customerCards.AppendLine("    <div class='card $cardColour'><div class='v'>$($Model.Exposure.Count)</div><div class='l'>Exposure findings</div></div>")
+        $expRows = New-Object System.Text.StringBuilder
+        foreach ($f in $Model.Exposure | Select-Object -First 25) {
+            $sevClass = "sev-$($f.severity)".ToLower()
+            $portal = "https://portal.azure.com/#@/resource$($f.resourceId)"
+            [void]$expRows.AppendLine("<tr><td><span class='pill $sevClass'>$(ConvertTo-HtmlText $f.severity)</span></td><td>$(ConvertTo-HtmlText $f.type)</td><td><a href='$portal' target='_blank'>$(ConvertTo-HtmlText $f.resourceName)</a></td><td>$(ConvertTo-HtmlText $f.evidence)</td><td>$(ConvertTo-HtmlText $f.recommendation)</td></tr>")
+        }
+        [void]$customerSections.AppendLine(@"
+<section>
+  <h2>Public exposure findings</h2>
+  <table><thead><tr><th>Severity</th><th>Type</th><th>Resource</th><th>Evidence</th><th>Recommendation</th></tr></thead><tbody>$($expRows.ToString())</tbody></table>
+</section>
+"@)
+    }
+
+    if ($Model.Access -and $Model.Access.Findings -and $Model.Access.Findings.Count -gt 0) {
+        $accRows = New-Object System.Text.StringBuilder
+        foreach ($f in $Model.Access.Findings) {
+            $sevClass = "sev-$($f.severity)".ToLower()
+            [void]$accRows.AppendLine("<tr><td><span class='pill $sevClass'>$(ConvertTo-HtmlText $f.severity)</span></td><td>$(ConvertTo-HtmlText $f.title)</td><td>$(ConvertTo-HtmlText $f.recommendation)</td></tr>")
+        }
+        [void]$customerSections.AppendLine(@"
+<section>
+  <h2>Access (RBAC) findings</h2>
+  <table><thead><tr><th>Severity</th><th>Finding</th><th>Recommendation</th></tr></thead><tbody>$($accRows.ToString())</tbody></table>
+</section>
+"@)
+    }
+
     $html = @"
 <!doctype html>
 <html lang="en">
@@ -173,6 +271,16 @@
   td.num { text-align:right; font-variant-numeric: tabular-nums; }
   code { background:#eef2f8; padding:1px 4px; border-radius:4px; font-size:12px; }
   a { color: var(--accent); text-decoration: none; }
+  /* v0.4.0 customer-grade additions */
+  .card.warn .v { color: #c87800; }
+  .card.crit .v { color: #b00020; }
+  .pill { display:inline-block; padding:2px 8px; border-radius:999px; font-size:11px; font-weight:600; background:#eef2f8; color:#3a4357; }
+  .pill.sev-high   { background:#fde7e9; color:#b00020; }
+  .pill.sev-medium { background:#fff4ce; color:#8a5500; }
+  .pill.sev-low    { background:#e6f4ea; color:#1e6b30; }
+  .pill.sev-info   { background:#e7eef9; color:#1f4f9c; }
+  .columns2 { display: grid; grid-template-columns: 1fr 1fr; gap:16px; }
+  @media (max-width: 900px) { .columns2 { grid-template-columns: 1fr; } }
   a:hover { text-decoration: underline; }
   .filter { margin:8px 0; display:flex; gap:8px; flex-wrap:wrap; }
   .filter input { flex:1; min-width:200px; padding:6px 8px; border:1px solid var(--border); border-radius:6px; }
@@ -197,9 +305,12 @@ $mermaidTag
     <div class="card"><div class="v">$resCount</div><div class="l">Resources</div></div>
     <div class="card"><div class="v">$typeCount</div><div class="l">Distinct types</div></div>
     <div class="card"><div class="v">$edgeCount</div><div class="l">Inferred edges</div></div>
+$customerCards
   </div>
 
   $confidenceBlock
+
+  $customerSections
 
   <div class="columns2">
     <section>

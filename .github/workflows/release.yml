@@ -1,0 +1,66 @@
+name: release
+
+# Publish the PowerShell module to the PowerShell Gallery whenever a v*.*.* tag
+# is pushed AND the PSGALLERY_API_KEY secret is configured on the repo.
+#
+# To enable:
+#   1. Create an API key at https://www.powershellgallery.com/account/apikeys
+#      scoped to the `AzureEstateExporter` module name.
+#   2. Add it as a repository secret named PSGALLERY_API_KEY.
+#   3. Push a tag like `v0.4.0` — this workflow validates the manifest, copies
+#      the module into a temp folder shaped the way Publish-Module expects, and
+#      runs Publish-Module.
+#
+# If the secret is missing, the workflow runs the manifest validation step and
+# exits cleanly so a tag push from a fork or before configuration does not
+# fail the release.
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish (e.g. 0.4.0). Defaults to module manifest value.'
+        required: false
+
+jobs:
+  publish:
+    name: Test manifest + publish to PSGallery
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate module manifest
+        shell: pwsh
+        run: |
+          $psd1 = './src/AzureEstateExporter/AzureEstateExporter.psd1'
+          Write-Host "Validating $psd1..."
+          $manifest = Test-ModuleManifest -Path $psd1
+          Write-Host "  Module: $($manifest.Name) v$($manifest.Version)"
+          Write-Host "  Exported functions: $($manifest.ExportedFunctions.Keys -join ', ')"
+          if ($manifest.ExportedFunctions.Count -eq 0) {
+            throw 'Manifest exports no functions — refusing to publish.'
+          }
+
+      - name: Publish to PowerShell Gallery
+        if: env.PSGALLERY_API_KEY != ''
+        shell: pwsh
+        env:
+          PSGALLERY_API_KEY: ${{ secrets.PSGALLERY_API_KEY }}
+        run: |
+          # Publish-Module wants the manifest to live under a folder whose name
+          # equals the module name. Our source layout already satisfies that
+          # (src/AzureEstateExporter/), so we publish straight from there.
+          $modulePath = (Resolve-Path './src/AzureEstateExporter').Path
+          Write-Host "Publishing from $modulePath..."
+          Publish-Module -Path $modulePath -NuGetApiKey $env:PSGALLERY_API_KEY -Verbose
+
+      - name: Skip publish (no PSGALLERY_API_KEY secret configured)
+        if: env.PSGALLERY_API_KEY == ''
+        run: |
+          echo "PSGALLERY_API_KEY secret is not set. Manifest validated; publish step skipped."
+          echo "See .github/workflows/release.yml header for configuration instructions."

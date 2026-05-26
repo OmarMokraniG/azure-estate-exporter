@@ -60,6 +60,11 @@
         [switch]$NoRedact,
         [switch]$NoTerraformRepo,
 
+        # Customer-grade collectors (v0.4.0). All on by default; opt-out switches.
+        [switch]$SkipCost,
+        [switch]$SkipSecurity,
+        [switch]$SkipPolicy,
+
         [int]$ResourceLimit = 500
     )
 
@@ -142,8 +147,37 @@
     $arg     = Invoke-ArgCollector  -SubscriptionIds $subIds -ResourceGroup $rgFilter
     $armExtras = Invoke-ArmCollector -SubscriptionIds $subIds -Errors $errors
 
+    # --- 5b. Customer-grade collectors (v0.4.0) -------------------------------
+    # Each one is best-effort: a Defender-disabled sub or a permissions error
+    # surfaces as an entry in $errors and a `*SubscriptionStatus` row on the
+    # collector output, never as a thrown exception.
+    $cost = $null; $security = $null; $policy = $null
+    if (-not $SkipCost) {
+        try { $cost = Invoke-CostCollector -SubscriptionIds $subIds -Errors $errors }
+        catch { Write-EstateLog "Cost collector failed: $($_.Exception.Message)" -Level Warn }
+    }
+    if (-not $SkipSecurity) {
+        try { $security = Invoke-SecurityCollector -SubscriptionIds $subIds -Errors $errors }
+        catch { Write-EstateLog "Security collector failed: $($_.Exception.Message)" -Level Warn }
+    }
+    if (-not $SkipPolicy) {
+        try { $policy = Invoke-PolicyStateCollector -SubscriptionIds $subIds -Errors $errors }
+        catch { Write-EstateLog "Policy collector failed: $($_.Exception.Message)" -Level Warn }
+    }
+
     # --- 6. Normalize ---------------------------------------------------------
     $model = ConvertTo-EstateModel -ArgRows $arg -ArmExtras $armExtras
+
+    # --- 6b. Derived analysis (no Azure calls; pure model functions) ----------
+    $model.Cost     = $cost
+    $model.Security = $security
+    $model.Policy   = $policy
+    try {
+        $model.Exposure = Invoke-ExposureAnalysis -Inventory $model.Inventory
+    } catch { Write-EstateLog "Exposure analysis failed: $($_.Exception.Message)" -Level Warn }
+    try {
+        $model.Access = Invoke-AccessAnalysis -RoleAssignments @($armExtras.RoleAssignments)
+    } catch { Write-EstateLog "Access analysis failed: $($_.Exception.Message)" -Level Warn }
 
     # Redaction pass.
     $safeModel = Protect-SensitiveValue -InputObject $model -NoRedact:$NoRedact
@@ -151,6 +185,11 @@
     if ($PSCmdlet.ShouldProcess("$runRoot/inventory.json", 'Write inventory')) {
         $safeModel.Inventory | ConvertTo-Json -Depth 32 | Set-Content "$runRoot/inventory.json" -Encoding utf8
         $safeModel.Graph     | ConvertTo-Json -Depth 32 | Set-Content "$runRoot/graph.json"     -Encoding utf8
+        if ($null -ne $safeModel.Cost)     { $safeModel.Cost     | ConvertTo-Json -Depth 8  | Set-Content "$runRoot/cost.json"     -Encoding utf8 }
+        if ($null -ne $safeModel.Security) { $safeModel.Security | ConvertTo-Json -Depth 16 | Set-Content "$runRoot/security.json" -Encoding utf8 }
+        if ($null -ne $safeModel.Policy)   { $safeModel.Policy   | ConvertTo-Json -Depth 16 | Set-Content "$runRoot/policy.json"   -Encoding utf8 }
+        if ($safeModel.Exposure)           { ,@($safeModel.Exposure) | ConvertTo-Json -Depth 16 | Set-Content "$runRoot/exposure.json" -Encoding utf8 }
+        if ($null -ne $safeModel.Access)   { $safeModel.Access   | ConvertTo-Json -Depth 16 | Set-Content "$runRoot/access.json"   -Encoding utf8 }
     }
 
     # --- 7. Renderers ---------------------------------------------------------

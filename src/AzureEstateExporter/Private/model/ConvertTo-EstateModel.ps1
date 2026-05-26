@@ -200,5 +200,12 @@
             resources     = $manifestResources
         }
         Extras    = $ArmExtras
+        # v0.4.0 — customer-grade sections, populated by Export-AzureEstate after
+        # the collectors / analysis steps have run.
+        Cost      = $null
+        Security  = $null
+        Policy    = $null
+        Exposure  = @()
+        Access    = $null
     }
 }
