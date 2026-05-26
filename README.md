@@ -144,6 +144,29 @@ See [`web/README.md`](web/README.md) for deployment to Azure Static Web Apps and
 notes on Microsoft's Azure architecture icons (we ship generic open-source
 placeholders; the official icons are an opt-in download).
 
+## Features (v0.4)
+
+- ✅ **Customer-grade assessment** — surfaces cost, Defender secure score,
+  policy compliance, public exposure, and RBAC findings out of the box.
+- ✅ **Deployable Terraform baseline repo** (v0.3.1) — clone the generated
+  `terraform-repo/` folder, run `bootstrap-import.ps1`, and `terraform plan`
+  says _No changes_ against the existing estate.
+
+### What's new in v0.4.0
+
+| New artefact | Source |
+|---|---|
+| `cost.json`     | Cost Management API (MonthToDate, grouped by RG + service) |
+| `security.json` | Defender for Cloud secure score + top unhealthy assessments |
+| `policy.json`   | ARG `policyresources` + Policy Insights non-compliant rows |
+| `exposure.json` | Derived from inventory (NSG 0.0.0.0/0, public storage/Key Vault, App Service without IP restrictions, public IPs) |
+| `access.json`   | Derived from collected role assignments (top privileged principals, broad-scope grants, orphaned assignments) |
+
+All five sections are also rendered into the Markdown report and the HTML
+dashboard, with severity pills and colour-coded headline cards.
+
+Opt-out switches: `-SkipCost`, `-SkipSecurity`, `-SkipPolicy`.
+
 ## Features (v0.2)
 
 - ✅ **Resource Graph–based** discovery across one subscription or all subscriptions visible to your identity.

@@ -3,6 +3,69 @@
 All notable changes to `azure-estate-exporter` are documented here.
 Format roughly follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.4.0] — 2026-05-26
+
+### Added
+
+- **Cost Management collector** (`Private/collectors/Invoke-CostCollector.ps1`)
+  — one purposeful POST per subscription against
+  `Microsoft.CostManagement/query`, grouped by `ResourceGroupName` +
+  `ServiceName` over `MonthToDate`. Writes `out/<timestamp>/cost.json`.
+- **Defender for Cloud collector** (`Invoke-SecurityCollector.ps1`) — pulls
+  secure score and top unhealthy assessments per subscription. Tolerates
+  Defender-disabled (404/410) and permissions errors gracefully and surfaces
+  them as `subscriptionStatus` rows. Writes `out/<timestamp>/security.json`.
+- **Policy compliance collector** (`Invoke-PolicyStateCollector.ps1`) — two
+  ARG queries (`policyresources` for headlines + per-assignment counts) plus
+  Policy Insights for detailed non-compliant findings (capped at
+  `MaxFindings`, default 5000). Writes `out/<timestamp>/policy.json`.
+- **Public-exposure analysis** (`Private/analysis/Invoke-ExposureAnalysis.ps1`)
+  — pure model-time analysis (no Azure calls). Emits severity-graded findings
+  for: NSG rules allowing 0.0.0.0/0 / `*` / `Internet` on management ports,
+  Storage accounts with `publicNetworkAccess=Enabled` + public blob access,
+  App Services without IP restrictions, Key Vaults with public + default-allow
+  ACLs, and informational Public IP entries. Works even without Defender.
+- **Access (RBAC) analysis** (`Invoke-AccessAnalysis.ps1`) — derives top
+  privileged principals, orphaned assignments (deleted principals), and
+  broad-scope findings (Owner / User Access Admin / Contributor at sub or RG
+  level). Writes `out/<timestamp>/access.json`.
+- **Markdown report** now has dedicated sections for Cost, Security, Policy
+  compliance, Public exposure and Access (RBAC) findings.
+- **HTML dashboard** gets new headline cards (cost total, secure score %,
+  policy compliance %, exposure-findings count) plus sections for Cost,
+  Security, Policy, Exposure and RBAC. Pills are colour-coded by severity.
+- **`outputs.tf`** in every `terraform-repo/infra/<rg>/` folder — generated
+  from `aztfexportResourceMapping.json` with meaningful names derived from
+  each Azure resource. Lets other Terraform repos consume the IDs of the
+  imported resources without reaching into the raw `res-N` naming.
+- **`-SkipCost`, `-SkipSecurity`, `-SkipPolicy`** opt-out switches on
+  `Export-AzureEstate` for restricted-permissions or cost-throttled runs.
+- **PowerShell Gallery publish workflow** (`.github/workflows/release.yml`)
+  triggered on `v*.*.*` tags. Validates the manifest with
+  `Test-ModuleManifest` and publishes via `Publish-Module` when the
+  `PSGALLERY_API_KEY` secret is set; safely skips otherwise.
+- **10 new Pester tests** (`tests/Analysis.Tests.ps1`) covering both
+  analysis functions with synthetic fixtures.
+
+### Changed
+
+- `ConvertTo-EstateModel` now exposes `Cost`, `Security`, `Policy`,
+  `Exposure`, and `Access` slots on the normalised model. Each is null when
+  the corresponding collector / analysis step is skipped or fails.
+- `Export-AzureEstate` writes additional per-area JSON artifacts:
+  `cost.json`, `security.json`, `policy.json`, `exposure.json`,
+  `access.json`.
+
+### Notes
+
+- All new collectors are **best-effort**: any per-sub failure ends up in
+  `errors.json` and the run proceeds.
+- The exposure analyser is intentionally conservative — it does NOT replace
+  Defender for Cloud, but gives you something actionable even on subs that
+  cannot enable Defender (e.g. dev / pay-as-you-go).
+- Cost Management API throttling: we deliberately use ONE grouped query per
+  subscription rather than slicing by tag — avoids the per-tenant rate limit.
+
 ## [0.3.1] — 2026-05-26
 
 ### Added
