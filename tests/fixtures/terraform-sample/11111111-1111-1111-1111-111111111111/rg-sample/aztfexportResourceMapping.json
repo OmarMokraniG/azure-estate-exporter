@@ -1,0 +1,12 @@
+{
+  "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/rg-sample": {
+    "resource_type": "azurerm_resource_group",
+    "resource_name": "res-0",
+    "resource_id": "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/rg-sample"
+  },
+  "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/rg-sample/providers/Microsoft.Storage/storageAccounts/stsample0001": {
+    "resource_type": "azurerm_storage_account",
+    "resource_name": "res-1",
+    "resource_id": "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/rg-sample/providers/Microsoft.Storage/storageAccounts/stsample0001"
+  }
+}
