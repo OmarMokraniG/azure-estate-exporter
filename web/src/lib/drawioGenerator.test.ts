@@ -77,20 +77,70 @@ describe('generateDrawioXml', () => {
     expect(xml).toContain('shape=image;html=1;');
   });
 
-  it('places resources into bands by category (Internet/Edge, Network, Compute, Data, Observability)', async () => {
+  it('places a NIC inside its subnet container (in-subnet edge)', async () => {
+    const vnetId =
+      '/subscriptions/s/resourceGroups/rg/providers/Microsoft.Network/virtualNetworks/vnet1';
+    const subnetId = `${vnetId}/subnets/snet-foo`;
+    const nic = mk({
+      id: '/subscriptions/s/resourceGroups/rg/providers/Microsoft.Network/networkInterfaces/nic1',
+      type: 'Microsoft.Network/networkInterfaces',
+      name: 'nic1',
+      properties: { ipConfigurations: [{ name: 'ip', properties: { subnet: { id: subnetId } } }] },
+    });
+    const vnet = mk({
+      id: vnetId,
+      type: 'Microsoft.Network/virtualNetworks',
+      name: 'vnet1',
+      properties: { subnets: [{ id: subnetId, name: 'snet-foo', properties: {} }] },
+    });
+    const xml = await generateDrawioXml({
+      resources: [vnet, nic],
+      edges: [{ from: nic.id, to: subnetId, relation: 'in-subnet' }],
+      fetcher: async () => '<svg/>',
+    });
+    expect(xml).toContain('Virtual network: vnet1');
+    expect(xml).toContain('Subnet: snet-foo');
+    // The NIC cell must be a child of the subnet cell.
+    const snMatch = xml.match(/<mxCell id="(snet_\d+)" value="Subnet: snet-foo"/);
+    expect(snMatch).toBeTruthy();
+    const snId = snMatch![1];
+    const nicHasSubnetParent = new RegExp(`parent="${snId}"`).test(xml);
+    expect(nicHasSubnetParent).toBe(true);
+  });
+
+  it('synthesises subnets from VNet properties.subnets when no standalone subnet rows exist', async () => {
+    const vnetId =
+      '/subscriptions/s/resourceGroups/rg/providers/Microsoft.Network/virtualNetworks/vnet1';
+    const vnet = mk({
+      id: vnetId,
+      type: 'Microsoft.Network/virtualNetworks',
+      name: 'vnet1',
+      properties: {
+        subnets: [
+          { id: `${vnetId}/subnets/sub-a`, name: 'sub-a', properties: {} },
+          { id: `${vnetId}/subnets/sub-b`, name: 'sub-b', properties: {} },
+        ],
+      },
+    });
+    const xml = await generateDrawioXml({
+      resources: [vnet],
+      fetcher: async () => '<svg/>',
+    });
+    expect(xml).toContain('Subnet: sub-a');
+    expect(xml).toContain('Subnet: sub-b');
+  });
+
+  it('places PaaS resources without a network home into the Platform services band', async () => {
     const xml = await generateDrawioXml({
       resources: [
-        mk({ type: 'Microsoft.Network/publicIPAddresses', name: 'pip' }),
-        mk({ type: 'Microsoft.Compute/virtualMachines', name: 'vm' }),
-        mk({ type: 'Microsoft.KeyVault/vaults', name: 'kv' }),
-        mk({ type: 'Microsoft.Insights/components', name: 'ai' }),
+        mk({ type: 'Microsoft.Storage/storageAccounts', name: 'stcontoso' }),
+        mk({ type: 'Microsoft.KeyVault/vaults', name: 'kv1' }),
       ],
       fetcher: async () => '<svg/>',
     });
-    expect(xml).toContain('Internet / Edge');
-    expect(xml).toContain('Compute &amp; Web');
-    expect(xml).toContain('Data &amp; Security');
-    expect(xml).toContain('Observability &amp; Integration');
+    expect(xml).toContain('Platform services');
+    expect(xml).toContain('stcontoso');
+    expect(xml).toContain('kv1');
   });
 
   it('falls back to the default icon when a fetch fails', async () => {
@@ -104,24 +154,47 @@ describe('generateDrawioXml', () => {
     expect(xml).toContain('image=data:image/svg+xml;base64,');
   });
 
-  it('emits an edge cell when from + to are both in scope', async () => {
+  it('emits an edge cell when from + to are both in scope (non-topology relations only)', async () => {
     const a = mk({
-      id: '/subscriptions/s/resourceGroups/rg/providers/Microsoft.Network/virtualNetworks/vnet1',
-      type: 'Microsoft.Network/virtualNetworks',
-      name: 'vnet1',
+      id: '/subscriptions/s/resourceGroups/rg/providers/Microsoft.Storage/storageAccounts/sta',
+      type: 'Microsoft.Storage/storageAccounts',
+      name: 'sta',
     });
     const b = mk({
-      id: '/subscriptions/s/resourceGroups/rg/providers/Microsoft.Network/networkInterfaces/nic1',
-      type: 'Microsoft.Network/networkInterfaces',
-      name: 'nic1',
+      id: '/subscriptions/s/resourceGroups/rg/providers/Microsoft.Web/sites/app1',
+      type: 'Microsoft.Web/sites',
+      name: 'app1',
     });
     const xml = await generateDrawioXml({
       resources: [a, b],
-      edges: [{ from: b.id, to: a.id, relation: 'in-vnet' }],
+      edges: [{ from: b.id, to: a.id, relation: 'uses-storage' }],
       fetcher: async () => '<svg/>',
     });
     expect(xml).toContain('edge="1"');
-    expect(xml).toContain('in-vnet');
+    expect(xml).toContain('uses-storage');
+  });
+
+  it('hides in-subnet / in-vnet edges because the container nesting expresses them', async () => {
+    const vnetId =
+      '/subscriptions/s/resourceGroups/rg/providers/Microsoft.Network/virtualNetworks/vnet1';
+    const subnetId = `${vnetId}/subnets/sub`;
+    const nic = mk({
+      id: '/subscriptions/s/resourceGroups/rg/providers/Microsoft.Network/networkInterfaces/nic',
+      type: 'Microsoft.Network/networkInterfaces',
+      name: 'nic',
+    });
+    const vnet = mk({
+      id: vnetId,
+      type: 'Microsoft.Network/virtualNetworks',
+      name: 'vnet1',
+      properties: { subnets: [{ id: subnetId, name: 'sub', properties: {} }] },
+    });
+    const xml = await generateDrawioXml({
+      resources: [vnet, nic],
+      edges: [{ from: nic.id, to: subnetId, relation: 'in-subnet' }],
+      fetcher: async () => '<svg/>',
+    });
+    expect(xml).not.toMatch(/edge="1"[^>]*?value="in-subnet"/);
   });
 
   it('skips edges whose endpoints are out of scope', async () => {
