@@ -8,12 +8,13 @@ Format roughly follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 
 - **Drawio diagram now actually renders**. v0.5.0 referenced
-  `mxgraph.azure.*` stencil names which are NOT in diagrams.net`s default
-  shape library (they live in the Microsoft MSCAE stencil that has to be
-  enabled by hand) — the file opened to blank squares. v0.5.1 embeds each
-  icon as a base64 SVG data URI in `shape=image;image=data:image/svg+xml;base64,…`,
-  making the file self-contained and renders the same in app.diagrams.net,
-  VS Code Draw.io Integration and Draw.io Desktop without any extra setup.
+  `mxgraph.azure.*` stencil names which are NOT in the diagrams.net
+  default shape library (they live in the Microsoft MSCAE stencil that
+  has to be enabled by hand) — the file opened to blank squares. v0.5.1
+  embeds each icon as a base64 SVG data URI in a
+  `shape=image;image=data:image/svg+xml;base64,...` style, making the
+  file self-contained. It renders the same in app.diagrams.net, VS Code
+  Draw.io Integration and Draw.io Desktop without any extra setup.
 - The 33 hand-drawn SVG icons are now shipped under
   `src/AzureEstateExporter/Assets/icons/` so the PowerShell renderer has
   access to them at runtime. The web app keeps loading from `/icons/`.
@@ -30,12 +31,13 @@ Format roughly follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   Bands are coloured + bordered for visual scanning. Edges use bezier
   curves with white-background labels for readability across containers.
 - **`-RenameResources` switch** on `New-AzureEstateTerraformRepo`. Renames
-  `res-0`, `res-1`, … to meaningful Terraform addresses derived from each
-  Azure resource`s actual name (e.g. `azurerm_storage_account.stcontoso`
-  instead of `azurerm_storage_account.res-12`). Rewrites resource
-  declarations + references in `main.tf`, the `terraform import` calls in
-  `bootstrap-import.ps1`, and `imports.md`. Recommended for customers
-  adopting Terraform as the foundation of a DevOps practice.
+  `res-0`, `res-1`, ... to meaningful Terraform addresses derived from
+  the actual Azure resource name (for example,
+  `azurerm_storage_account.stcontoso` instead of
+  `azurerm_storage_account.res-12`). Rewrites resource declarations and
+  references in `main.tf`, the `terraform import` calls in
+  `bootstrap-import.ps1`, and the entries in `imports.md`. Recommended
+  for customers adopting Terraform as the foundation of a DevOps practice.
 - **Terraform best-practice scaffolding** in every packaged repo:
   - `terraform.tf` with `required_version = ">= 1.5.0"` and the `azurerm`
     provider pinned to the version aztfexport produced the HCL with.
