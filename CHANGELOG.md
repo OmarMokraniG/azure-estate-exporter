@@ -3,6 +3,63 @@
 All notable changes to `azure-estate-exporter` are documented here.
 Format roughly follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.6.0] — 2026-05-27
+
+### Changed — modern UI overhaul
+
+The web app gets a full visual redesign. Same features and data flows, much
+more modern feel.
+
+- **Dark mode** out of the box. The app starts in whatever theme matches
+  `prefers-color-scheme`; a sun/moon toggle in the header switches it and
+  the choice is persisted (Zustand + localStorage). All surfaces use CSS
+  variables so the switch is instant.
+- **New design tokens** in `index.css` — zinc surfaces, indigo accent,
+  rounded-xl cards, soft shadows, subtle backdrop blur on header/footer.
+  Inter Variable + JetBrains Mono via Google Fonts. Replaces the old
+  Azure-blue palette.
+- **Layered app shell** (`components/layout/AppShell.tsx`) — sticky header
+  with logo, scope breadcrumb, theme toggle, user pill + sign-out; sticky
+  footer with the GitHub link.
+- **Estate view rebuilt with a sidebar nav** (Diagram / Resources /
+  Terraform) plus a Change-scope crumb on top. The old top-bar tabs are
+  gone.
+- **Lucide-react icons** everywhere (Cloud, Folder, FileCode2, Workflow,
+  LayoutDashboard, Lightbulb, Sparkles, …). Replaces the emoji that the
+  FileTree and various banners used.
+- **Login page** is now a proper landing hero with feature pills and a
+  gradient illustration tile.
+- **Scope picker** redone as a two-pane command-center layout with
+  built-in search inputs, loading skeletons (no more "Loading…" text),
+  and click-target cards.
+- **Resource detail drawer** gets a backdrop blur, slide-in animation,
+  Copy-id and Open-in-portal buttons in the title row, and a tag-pill
+  grid for resource tags.
+- **Resources tab KPI cards** now use Lucide icons + tone-aware colours
+  (potential savings is amber when > $50/month, etc.). FinOps panel is
+  collapsible. Tables use a sticky header pattern with zebra hover.
+- **Diagram tab** has a **floating toolbar** over the canvas (resource +
+  edge counts on the left, drawio export + diagrams.net link on the
+  right). Background grid + minimap respect dark mode.
+- **Terraform tab** has a compact header strip with coverage %, Download
+  .zip primary button, and a collapsible CLI-handoff panel. The file
+  tree uses real Lucide icons by language (HCL / Markdown / JSON) and a
+  chevron for folders.
+- **Loading skeletons** with shimmer animation replace text "Loading…"
+  spinners on the scope picker and the diagram tab.
+
+### Added
+
+- `lucide-react ^0.460.0` + `clsx ^2.1.1` to web/package.json.
+- `zustand/middleware` `persist` to remember theme + active tab across
+  reloads.
+
+### Notes
+
+- The PowerShell module is unchanged in this release. 44/44 Pester still
+  pass; the redesign is web-only.
+- Bundle size went from 277 KB gzip to 285 KB gzip (+lucide icons, +clsx).
+
 ## [0.5.1] — 2026-05-27
 
 ### Fixed

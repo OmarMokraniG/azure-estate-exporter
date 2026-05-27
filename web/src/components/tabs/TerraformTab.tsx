@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import JSZip from 'jszip';
+import { ChevronDown, Download, FileCode2, Terminal } from 'lucide-react';
 import type { ArgResource } from '@/api/arm';
 import { useUi } from '@/state/store';
 import { generateTerraformRepo, isFullySupported, type GeneratedFile } from '@/lib/terraformGenerator';
@@ -28,7 +29,6 @@ export function TerraformTab({ resources }: { resources: ArgResource[] }) {
 
   const selectedFile = files.find((f) => f.path === selectedPath) ?? files[0] ?? null;
   if (selectedFile && !selectedPath) {
-    // Auto-select first file on initial render.
     queueMicrotask(() => setSelectedPath(selectedFile.path));
   }
 
@@ -59,66 +59,71 @@ export function TerraformTab({ resources }: { resources: ArgResource[] }) {
 
   if (resources.length === 0) {
     return (
-      <div className="grid h-[60vh] place-items-center text-slate-500">
+      <div className="grid h-[70vh] place-items-center text-sm text-subtle">
         No resources in scope — pick a subscription / RG first.
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col gap-3 p-4">
-      {/* Coverage banner */}
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900">
-        <div>
+    <div className="flex h-full flex-col gap-3 p-4">
+      {/* Header / toolbar */}
+      <div className="flex flex-wrap items-center gap-3 rounded-xl border border-default bg-surface-2/40 px-4 py-2.5">
+        <FileCode2 className="h-4 w-4 text-accent" />
+        <div className="text-sm text-fg">
           <strong>{coverage}%</strong> of {totalCount} resources rendered with native HCL
           {coverage < 100 && (
-            <>
-              {' '}— the rest are emitted as commented stubs.{' '}
-              <span className="text-amber-800">
-                For full coverage, run the PowerShell module locally (see below).
-              </span>
-            </>
+            <span className="ml-1 text-muted">— rest as commented stubs.</span>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-2">
           <button
             type="button"
-            className="btn-primary !py-1 !text-xs"
+            className="btn-primary !py-1.5 !text-xs"
             onClick={downloadZip}
             disabled={downloading || files.length === 0}
           >
+            <Download className="h-3.5 w-3.5" />
             {downloading ? 'Zipping…' : 'Download .zip'}
           </button>
           <button
             type="button"
-            className="btn-ghost !py-1 !text-xs"
+            className="btn-ghost !py-1.5 !text-xs"
             onClick={() => setShowCli((v) => !v)}
           >
-            {showCli ? 'Hide' : 'Show'} CLI handoff
+            <Terminal className="h-3.5 w-3.5" />
+            {showCli ? 'Hide CLI' : 'Show CLI'}
+            <ChevronDown
+              className={`h-3 w-3 transition-transform ${showCli ? 'rotate-180' : ''}`}
+            />
           </button>
         </div>
       </div>
 
-      {/* File tree + viewer */}
-      <div className="grid h-[70vh] grid-cols-[260px_1fr] gap-3">
-        <FileTree files={files} selectedPath={selectedFile?.path ?? null} onSelect={setSelectedPath} />
+      {/* Tree + viewer */}
+      <div className="grid h-[60vh] grid-cols-[260px_1fr] gap-3">
+        <FileTree
+          files={files}
+          selectedPath={selectedFile?.path ?? null}
+          onSelect={setSelectedPath}
+        />
         <CodeViewer file={selectedFile} />
       </div>
 
       {/* Collapsible CLI handoff */}
       {showCli && (
-        <details open className="card p-4 text-sm text-slate-700">
+        <details open className="surface p-4 text-sm text-fg">
           <summary className="cursor-pointer text-base font-semibold">
             Production-grade export (PowerShell + aztfexport)
           </summary>
-          <p className="my-2 text-slate-600">
+          <p className="my-2 text-muted">
             The in-browser repo above is a fast baseline. To get a repo that <em>imports every
             resource into Terraform state</em> (so the first <code className="font-mono">terraform plan</code>{' '}
             shows <em>No changes</em>), run the PowerShell module locally — it shells out to{' '}
             <code className="font-mono">aztfexport</code> and produces a{' '}
             <code className="font-mono">bootstrap-import.ps1</code> alongside the HCL.
           </p>
-          <pre className="overflow-x-auto rounded bg-slate-900 p-3 font-mono text-xs text-slate-100">
+          <pre className="overflow-x-auto rounded-lg bg-zinc-950 p-3 font-mono text-xs text-zinc-100">
 {`# 1. Install prerequisites
 winget install Microsoft.PowerShell
 winget install Microsoft.AzureCLI
@@ -131,7 +136,7 @@ cd azure-estate-exporter
 Import-Module ./src/AzureEstateExporter -Force
 
 # 3. Export this scope (writes out/<timestamp>/terraform-repo/)
-${cliExport}
+${cliExport} -RenameResources
 
 # 4. Deploy
 cd out/<timestamp>/terraform-repo/infra/${scope.resourceGroup ?? '<rg>'}

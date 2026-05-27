@@ -1,10 +1,8 @@
 import { useMemo } from 'react';
+import { ChevronRight, FileCode2, FileText, FileJson, Folder } from 'lucide-react';
+import clsx from 'clsx';
 import type { GeneratedFile } from '@/lib/terraformGenerator';
 
-/**
- * A FileTree node — either a folder containing children or a leaf pointing
- * at a `GeneratedFile`.
- */
 interface TreeNode {
   name: string;
   path: string;
@@ -47,17 +45,17 @@ function sortRecursive(n: TreeNode) {
   for (const c of n.children) sortRecursive(c);
 }
 
-function iconFor(file?: GeneratedFile): string {
-  if (!file) return '📁';
+function FileIcon({ file }: { file?: GeneratedFile }) {
+  if (!file) return <Folder className="h-3.5 w-3.5 text-amber-500" />;
   switch (file.language) {
     case 'hcl':
-      return '🌍';
+      return <FileCode2 className="h-3.5 w-3.5 text-violet-500" />;
     case 'markdown':
-      return '📝';
+      return <FileText className="h-3.5 w-3.5 text-blue-500" />;
     case 'json':
-      return '📄';
+      return <FileJson className="h-3.5 w-3.5 text-emerald-500" />;
     default:
-      return '📄';
+      return <FileText className="h-3.5 w-3.5 text-subtle" />;
   }
 }
 
@@ -76,15 +74,23 @@ function Node({
   return (
     <>
       <div
-        className={`flex cursor-pointer items-center gap-1 truncate px-2 py-0.5 text-xs ${
-          isSelected ? 'bg-azure-100 font-semibold text-azure-800' : 'hover:bg-slate-50'
-        }`}
+        className={clsx(
+          'flex cursor-pointer select-none items-center gap-1.5 truncate rounded-md px-2 py-1 text-xs transition-colors',
+          isSelected
+            ? 'bg-accent-soft text-accent font-medium'
+            : 'text-muted hover:bg-surface-2 hover:text-fg',
+        )}
         style={{ paddingLeft: 8 + depth * 14 }}
         onClick={() => node.file && onSelect(node.path)}
         role={node.file ? 'button' : 'presentation'}
         tabIndex={node.file ? 0 : -1}
       >
-        <span className="shrink-0">{node.isDir ? '📁' : iconFor(node.file)}</span>
+        {node.isDir ? (
+          <ChevronRight className="h-3 w-3 shrink-0 text-subtle" />
+        ) : (
+          <span className="w-3 shrink-0" />
+        )}
+        <FileIcon file={node.file} />
         <span className="truncate">{node.name || 'repo'}</span>
       </div>
       {node.children.map((c) => (
@@ -106,7 +112,7 @@ export function FileTree({
   const root = useMemo(() => buildTree(files), [files]);
 
   return (
-    <div className="h-full overflow-auto rounded border border-slate-200 bg-white py-2">
+    <div className="h-full overflow-auto rounded-lg border border-default bg-surface py-2">
       {root.children.map((c) => (
         <Node key={c.path} node={c} depth={0} selectedPath={selectedPath} onSelect={onSelect} />
       ))}
