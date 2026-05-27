@@ -1,4 +1,4 @@
-function New-AzureEstateTerraformRepo {
+﻿function New-AzureEstateTerraformRepo {
     <#
     .SYNOPSIS
         Packages an existing `Export-AzureEstate` output into a deployable
@@ -26,6 +26,14 @@ function New-AzureEstateTerraformRepo {
         Run `git init` (and `git commit -m "Initial export ..."` if git identity
         is configured) in the generated folder. Off by default.
 
+    .PARAMETER RenameResources
+        Rename the per-resource Terraform addresses from aztfexport`s default
+        `res-0`, `res-1` style to meaningful names derived from the Azure
+        resource name (sanitised to fit Terraform identifier rules).
+        Rewrites `main.tf`, `outputs.tf`, `bootstrap-import.ps1` and
+        `imports.md` consistently. Off by default — opt-in because the
+        rewrite uses targeted regex on HCL.
+
     .PARAMETER Force
         Overwrite `OutputPath` if it already exists.
 
@@ -33,14 +41,16 @@ function New-AzureEstateTerraformRepo {
         New-AzureEstateTerraformRepo -InputPath ./out/2026-05-26T09-45-06
 
     .EXAMPLE
+        # The "give me a customer-grade repo" form
         New-AzureEstateTerraformRepo -InputPath ./out/2026-05-26T09-45-06 `
-                                     -OutputPath ./my-tf-repo -InitGit -Force
+            -OutputPath ./my-tf-repo -RenameResources -InitGit -Force
     #>
     [CmdletBinding(SupportsShouldProcess)]
     param(
         [string]$InputPath,
         [string]$OutputPath,
         [switch]$InitGit,
+        [switch]$RenameResources,
         [switch]$Force
     )
 
@@ -78,5 +88,6 @@ function New-AzureEstateTerraformRepo {
         -RepoPath $OutputPath `
         -GeneratorVersion $version `
         -InitGit:$InitGit `
+        -RenameResources:$RenameResources `
         -Force:$Force
 }

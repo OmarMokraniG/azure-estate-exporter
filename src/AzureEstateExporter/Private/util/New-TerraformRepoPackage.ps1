@@ -52,6 +52,13 @@
         Run `git init && git add -A && git commit -m "Initial export"`. Only commits
         if a git identity is configured; otherwise leaves staged changes and warns.
 
+    .PARAMETER RenameResources
+        Rename `res-0`, `res-1` etc. to meaningful names derived from each
+        Azure resource`s actual name. Rewrites declarations + references in
+        `main.tf`, the entries in `outputs.tf` and the
+        `terraform import ...` calls in `bootstrap-import.ps1` and
+        `imports.md`. Off by default.
+
     .PARAMETER Force
         Overwrite the destination if it already exists.
     #>
@@ -61,6 +68,7 @@
         [Parameter(Mandatory)] [string]$RepoPath,
         [string]$GeneratorVersion,
         [switch]$InitGit,
+        [switch]$RenameResources,
         [switch]$Force
     )
 
@@ -116,8 +124,79 @@
         $rawMapping   = Join-Path $rgDir.FullName 'aztfexportResourceMapping.json'
         $rawSkipped   = Join-Path $rgDir.FullName 'aztfexportSkippedResources.txt'
 
-        # 1. Copy main.tf untouched (this is the actual HCL).
-        Copy-Item -Path $rawMain -Destination (Join-Path $dest 'main.tf') -Force
+        # 0. Parse the aztfexport mapping FIRST. It tells us, for every
+        #    Azure resource, the Terraform address `aztfexport` chose
+        #    (typically `azurerm_<x>.res-N`). We use it to:
+        #      * generate per-resource outputs.tf entries
+        #      * generate bootstrap-import.ps1 + imports.md
+        #      * optionally rewrite `res-N` to a meaningful name
+        $mappingObj = $null
+        if (Test-Path $rawMapping) {
+            try {
+                $mappingObj = Get-Content $rawMapping -Raw | ConvertFrom-Json -AsHashtable -ErrorAction Stop
+            } catch {
+                $mappingObj = $null
+                Write-EstateLog "Could not parse mapping file for '$rgName': $($_.Exception.Message)" -Level Warn
+            }
+        }
+
+        # 0b. Build rename map (old tf-address -> new tf-address) when
+        #     -RenameResources is in effect. `res-0` style is fine for
+        #     transient exports but it`s a non-starter for a customer-grade
+        #     IaC repo, so this is the recommended switch for the
+        #     "give me a foundation for our DevOps practice" workflow.
+        $renameMap = @{}   # old "type.name" -> new "type.name"
+        $renameAddrs = @{} # old "name" -> new "name" (without type prefix)
+        if ($RenameResources -and $mappingObj) {
+            $usedNames = New-Object System.Collections.Generic.HashSet[string]
+            $entries = New-Object System.Collections.Generic.List[pscustomobject]
+            foreach ($azId in ($mappingObj.Keys | Sort-Object)) {
+                $e = $mappingObj[$azId]
+                $oldType = $null; $oldName = $null
+                if ($e -is [string] -and $e -match '^([^.]+)\.(.+)$') { $oldType = $Matches[1]; $oldName = $Matches[2] }
+                elseif ($e -is [System.Collections.IDictionary] -and $e.ContainsKey('resource_type')) { $oldType = $e.resource_type; $oldName = $e.resource_name }
+                if (-not $oldType -or -not $oldName) { continue }
+                $entries.Add([pscustomobject]@{ AzId = $azId; OldType = $oldType; OldName = $oldName })
+            }
+            # Build new names from the Azure resource leaf segment.
+            foreach ($entry in $entries) {
+                $azLeaf = ($entry.AzId -split '/')[-1]
+                $base = ($azLeaf.ToLower() -replace '[^a-z0-9]+', '_').Trim('_')
+                if ([string]::IsNullOrEmpty($base) -or $base -match '^\d') { $base = "r_$base" }
+                $candidate = $base
+                $i = 2
+                while ($usedNames.Contains($candidate)) {
+                    $candidate = "${base}_$i"; $i++
+                }
+                [void]$usedNames.Add($candidate)
+                if ($candidate -ne $entry.OldName) {
+                    $renameMap["$($entry.OldType).$($entry.OldName)"] = "$($entry.OldType).$candidate"
+                    $renameAddrs[$entry.OldName] = $candidate
+                }
+            }
+            Write-EstateLog ("Renaming {0} resource(s) in RG '{1}'" -f $renameMap.Count, $rgName) -Level Verbose
+        }
+
+        # 1. Copy + (optionally) rename main.tf.
+        $mainCopy = Join-Path $dest 'main.tf'
+        Copy-Item -Path $rawMain -Destination $mainCopy -Force
+        if ($renameAddrs.Count -gt 0) {
+            $mainText = Get-Content $mainCopy -Raw
+            # Iterate longest-name-first so a partial-prefix rename can`t
+            # corrupt a later, longer name.
+            foreach ($old in $renameAddrs.Keys | Sort-Object -Property Length -Descending) {
+                $new = $renameAddrs[$old]
+                # Match `res-N` at three boundaries that aztfexport uses:
+                #   resource "azurerm_x" "res-N"   ← declaration
+                #   azurerm_x.res-N.id             ← reference
+                # The regex below requires the name to be word-bounded so we
+                # don`t replace a substring inside another identifier.
+                $escaped = [regex]::Escape($old)
+                $mainText = [regex]::Replace($mainText, "(?<=`")$escaped(?=`"\s*\{)", $new)
+                $mainText = [regex]::Replace($mainText, "(?<=\.)$escaped(?=\b)", $new)
+            }
+            Set-Content -Path $mainCopy -Value $mainText -Encoding utf8
+        }
 
         # 2. Rewrite provider.tf: replace hardcoded subscription_id with var.
         $providerHcl = if (Test-Path $rawProvider) { Get-Content $rawProvider -Raw } else { '' }
@@ -132,14 +211,39 @@ provider "azurerm" {
         }
         Set-Content -Path (Join-Path $dest 'provider.tf') -Value $rewrittenProvider -Encoding utf8
 
-        # 3. Rewrite terraform.tf: strip the `backend "local" {}` block so the
-        #    repo defaults to local state but users can drop in their own backend.
-        if (Test-Path $rawTerraform) {
-            $tfBlock = Get-Content $rawTerraform -Raw
-            # Remove `backend "local" {}` (with optional whitespace/newlines).
-            $tfBlock = $tfBlock -replace '(?ms)\s*backend\s+"local"\s*\{\s*\}', ''
-            Set-Content -Path (Join-Path $dest 'terraform.tf') -Value $tfBlock -Encoding utf8
-        }
+        # 3. Rewrite terraform.tf: strip the `backend "local" {}` block AND
+        #    upgrade it to a customer-grade shape (required_version, pinned
+        #    provider, formal required_providers block).
+        $tfBlock = if (Test-Path $rawTerraform) {
+            (Get-Content $rawTerraform -Raw) -replace '(?ms)\s*backend\s+"local"\s*\{\s*\}', ''
+        } else { '' }
+        # Extract the provider version aztfexport pinned (if any) — it`s
+        # the closest thing we have to "the version that was used to
+        # generate this HCL", so pin to it for reproducibility.
+        $pinnedVer = $null
+        $vm = [regex]::Match($tfBlock, '(?ms)azurerm\s*=\s*\{[^}]*?version\s*=\s*"([^"]+)"')
+        if ($vm.Success) { $pinnedVer = $vm.Groups[1].Value }
+        if (-not $pinnedVer) { $pinnedVer = '~> 4.0' }
+        $terraformTfTemplate = @'
+# Terraform + provider version pinning.
+#
+# `required_version` is set to the minimum CLI version validated by
+# azure-estate-exporter. Bump as you upgrade your toolchain.
+#
+# `azurerm` is pinned to the version aztfexport used to generate this HCL;
+# upgrading the provider may require updating resource arguments below.
+terraform {
+  required_version = ">= 1.5.0"
+  required_providers {
+    azurerm = {
+      source  = "hashicorp/azurerm"
+      version = "__VERSION__"
+    }
+  }
+}
+'@
+        $terraformTf = $terraformTfTemplate.Replace('__VERSION__', $pinnedVer)
+        Set-Content -Path (Join-Path $dest 'terraform.tf') -Value $terraformTf -Encoding utf8
 
         # 4. Lock file: keep it for reproducibility.
         if (Test-Path $rawLock) { Copy-Item $rawLock (Join-Path $dest '.terraform.lock.hcl') -Force }
@@ -148,18 +252,71 @@ provider "azurerm" {
         if (Test-Path $rawMapping) { Copy-Item $rawMapping (Join-Path $dest 'aztfexportResourceMapping.json') -Force }
         if (Test-Path $rawSkipped) { Copy-Item $rawSkipped (Join-Path $dest 'aztfexportSkippedResources.txt') -Force }
 
-        # 6. variables.tf + terraform.tfvars.example
-        @"
+        # 6. variables.tf + terraform.tfvars.example + locals.tf.
+        @'
+# Inputs for this resource group.
+
 variable "subscription_id" {
-  description = "Target Azure subscription ID. Set per-environment in terraform.tfvars."
+  description = "Target Azure subscription ID."
   type        = string
+
+  validation {
+    condition     = can(regex("^[0-9a-f-]{36}$", var.subscription_id))
+    error_message = "subscription_id must be a GUID."
+  }
 }
-"@ | Set-Content -Path (Join-Path $dest 'variables.tf') -Encoding utf8
+
+variable "environment" {
+  description = "Environment short tag (e.g. dev, staging, prod). Merged into the default tag set."
+  type        = string
+  default     = "imported"
+}
+
+variable "owner" {
+  description = "Owner / team label, applied to managed-by / owner tags."
+  type        = string
+  default     = "unspecified"
+}
+
+variable "additional_tags" {
+  description = "Extra tags merged on top of the default tag set defined in locals.tf."
+  type        = map(string)
+  default     = {}
+}
+'@ | Set-Content -Path (Join-Path $dest 'variables.tf') -Encoding utf8
+
+        @'
+# Common locals shared across the resources in this folder.
+#
+# common_tags is what new resources should reference:
+#
+#     tags = merge(local.common_tags, { app = "billing-api" })
+#
+# Existing resources keep whatever tags aztfexport extracted in main.tf;
+# review and align them with local.common_tags as you re-IaC them.
+locals {
+  common_tags = merge(
+    {
+      "managed-by"  = "terraform"
+      "owner"       = var.owner
+      "environment" = var.environment
+      "source"      = "azure-estate-exporter"
+    },
+    var.additional_tags
+  )
+}
+'@ | Set-Content -Path (Join-Path $dest 'locals.tf') -Encoding utf8
 
         @"
 # Copy this file to terraform.tfvars (gitignored) and fill in your values.
-# Original source subscription was: $subId
-subscription_id = "$subId"
+# The original source subscription was: $subId
+subscription_id  = "$subId"
+environment      = "imported"
+owner            = "unspecified"
+additional_tags  = {
+  # cost_center = "1234"
+  # project     = "billing"
+}
 "@ | Set-Content -Path (Join-Path $dest 'terraform.tfvars.example') -Encoding utf8
 
         # 6b. outputs.tf — meaningful output names per resource.
@@ -175,6 +332,14 @@ subscription_id = "$subId"
                 elseif ($entry.ContainsKey('resource_type')) { $tfType = $entry.resource_type; $tfName = $entry.resource_name }
                 if (-not $tfType -or -not $tfName) { continue }
 
+                # Apply the rename map (built in step 0b) so outputs reference
+                # the new, meaningful resource name when -RenameResources was set.
+                $oldAddr = "$tfType.$tfName"
+                if ($renameMap.ContainsKey($oldAddr)) {
+                    $renamedAddr = $renameMap[$oldAddr]
+                    $tfName = ($renamedAddr -split '\.', 2)[1]
+                }
+
                 # Build a meaningful output identifier from the actual Azure
                 # resource name (last segment of the ARM id). Terraform output
                 # names must match [a-z_][a-z0-9_]*.
@@ -189,6 +354,10 @@ subscription_id = "$subId"
                 }
                 [void]$usedNames.Add($candidate)
 
+                # Storage/Key Vault outputs may carry sensitive values via
+                # downstream consumers; mark `_connection_string`-style outputs
+                # as sensitive by default. We only emit `_id` here so the
+                # `sensitive` flag is informational for now.
                 $outLines.Add(@"
 output "${candidate}_id" {
   description = "Azure resource ID for $azName ($tfType)."
@@ -215,15 +384,6 @@ output "${candidate}_id" {
         # 8. Generate bootstrap-import.ps1 + imports.md from the mapping file.
         $importedCount = 0
         $skippedCount  = 0
-        $mappingObj    = $null
-        if (Test-Path $rawMapping) {
-            try {
-                $mappingObj = Get-Content $rawMapping -Raw | ConvertFrom-Json -AsHashtable -ErrorAction Stop
-            } catch {
-                $mappingObj = $null
-                Write-EstateLog "Could not parse mapping file for '$rgName': $($_.Exception.Message)" -Level Warn
-            }
-        }
         if ($mappingObj) {
             $importedCount = $mappingObj.Keys.Count
             $importLines     = New-Object System.Collections.Generic.List[string]
@@ -236,6 +396,8 @@ output "${candidate}_id" {
                           elseif ($entry.ContainsKey('resource_type') -and $entry.ContainsKey('resource_name')) { "$($entry.resource_type).$($entry.resource_name)" }
                           else { $null }
                 if (-not $tfAddr) { continue }
+                # Apply the rename map if we built one.
+                if ($renameMap.ContainsKey($tfAddr)) { $tfAddr = $renameMap[$tfAddr] }
                 $importLines.Add(("terraform import '{0}' '{1}'" -f $tfAddr, $azId))
                 $bootstrapLines.Add(("Invoke-Import -Address '{0}' -AzureId '{1}'" -f $tfAddr.Replace("'", "''"), $azId.Replace("'", "''")))
             }
@@ -423,6 +585,200 @@ Thumbs.db
 # Copy this file to each `infra/<rg>/` folder as `backend.tf` and run
 # `terraform init -migrate-state`.
 '@ | Set-Content -Path (Join-Path $RepoPath 'backend.tf.example') -Encoding utf8
+
+    # --- v0.5.1: customer-grade DevOps scaffolding -------------------------
+    @'
+# EditorConfig is awesome: https://editorconfig.org
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+indent_style = space
+indent_size = 2
+trim_trailing_whitespace = true
+insert_final_newline = true
+
+[*.{tf,tfvars,hcl}]
+indent_size = 2
+
+[Makefile]
+indent_style = tab
+'@ | Set-Content -Path (Join-Path $RepoPath '.editorconfig') -Encoding utf8
+
+    @'
+# tflint configuration for Azure baseline repos.
+# Run:  tflint --init && tflint --recursive
+#
+# Docs:
+#   - tflint:                https://github.com/terraform-linters/tflint
+#   - azurerm ruleset:       https://github.com/terraform-linters/tflint-ruleset-azurerm
+
+config {
+  format     = "compact"
+  call_module_type = "local"
+}
+
+plugin "azurerm" {
+  enabled = true
+  version = "0.27.0"
+  source  = "github.com/terraform-linters/tflint-ruleset-azurerm"
+}
+
+# Standard core rules
+rule "terraform_required_version" { enabled = true }
+rule "terraform_required_providers" { enabled = true }
+rule "terraform_typed_variables" { enabled = true }
+rule "terraform_documented_outputs" { enabled = true }
+rule "terraform_documented_variables" { enabled = true }
+rule "terraform_naming_convention" {
+  enabled = true
+  format  = "snake_case"
+}
+
+# We knowingly emit deprecated arguments for some imported resources because
+# aztfexport stops at the schema the provider used at export time. Disable
+# this rule until you`ve hand-cleaned the HCL.
+rule "azurerm_resource_deprecated_arguments" {
+  enabled = false
+}
+'@ | Set-Content -Path (Join-Path $RepoPath '.tflint.hcl') -Encoding utf8
+
+    @'
+# Common targets for the imported Azure estate.
+# Run from the repo root.
+
+INFRA_DIRS := $(wildcard infra/*)
+
+.PHONY: help fmt validate lint plan-all plan apply-all clean
+
+help:
+	@echo "Targets:"
+	@echo "  make fmt            terraform fmt -recursive"
+	@echo "  make validate       terraform validate in every infra/<rg>"
+	@echo "  make lint           tflint --recursive (requires tflint installed)"
+	@echo "  make plan-all       terraform plan in every infra/<rg>"
+	@echo "  make plan rg=<rg>   terraform plan in infra/<rg>"
+	@echo "  make bootstrap rg=<rg>   run bootstrap-import.ps1 in infra/<rg>"
+
+fmt:
+	terraform fmt -recursive
+
+validate:
+	@for d in $(INFRA_DIRS); do \
+		echo ">>> $$d"; \
+		(cd $$d && terraform init -backend=false -input=false >/dev/null && terraform validate) || exit 1; \
+	done
+
+lint:
+	tflint --recursive
+
+plan-all:
+	@for d in $(INFRA_DIRS); do \
+		echo ">>> $$d"; \
+		(cd $$d && terraform init -input=false && terraform plan -input=false) || exit 1; \
+	done
+
+plan:
+	@test -n "$(rg)" || (echo "Usage: make plan rg=<rg>"; exit 1)
+	cd infra/$(rg) && terraform init -input=false && terraform plan -input=false
+
+bootstrap:
+	@test -n "$(rg)" || (echo "Usage: make bootstrap rg=<rg>"; exit 1)
+	cd infra/$(rg) && pwsh -File ./bootstrap-import.ps1
+
+clean:
+	find . -type d -name ".terraform" -prune -exec rm -rf {} +
+	find . -type f -name "*.tfstate" -delete
+	find . -type f -name "*.tfstate.*" -delete
+'@ | Set-Content -Path (Join-Path $RepoPath 'Makefile') -Encoding utf8
+
+    # GitHub Actions workflow stub. Disabled by default (would otherwise
+    # run on every push to a fresh repo before the user`s set up auth).
+    New-Item -ItemType Directory -Path (Join-Path $RepoPath '.github/workflows') -Force | Out-Null
+    @'
+# Terraform CI for the azure-estate-exporter baseline repo.
+#
+# What it runs:
+#   - terraform fmt -check (style)
+#   - terraform validate (every infra/<rg>)
+#   - tflint --recursive (lint)
+#
+# What it does NOT run:
+#   - terraform plan / apply — those need an Azure identity. Configure
+#     `OIDC` or a service principal secret first and uncomment the plan job.
+#
+# Triggered on PR to main + manual workflow_dispatch.
+
+name: terraform
+
+on:
+  pull_request:
+    paths:
+      - 'infra/**'
+      - '.tflint.hcl'
+      - '.github/workflows/terraform.yml'
+  workflow_dispatch:
+
+jobs:
+  fmt-validate-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~> 1.7"
+
+      - name: terraform fmt
+        run: terraform fmt -check -recursive
+
+      - name: terraform validate (per infra/<rg>)
+        run: |
+          set -euo pipefail
+          for d in infra/*/; do
+            echo ">>> $d"
+            (cd "$d" && terraform init -backend=false -input=false && terraform validate)
+          done
+
+      - uses: terraform-linters/setup-tflint@v4
+        with:
+          tflint_version: latest
+
+      - name: tflint
+        run: |
+          tflint --init
+          tflint --recursive
+
+  # Uncomment once you`ve added an Azure identity (OIDC or service principal).
+  #
+  # plan:
+  #   needs: fmt-validate-lint
+  #   runs-on: ubuntu-latest
+  #   permissions:
+  #     id-token: write   # required for OIDC
+  #     contents: read
+  #   env:
+  #     ARM_CLIENT_ID:       ${{ secrets.AZURE_CLIENT_ID }}
+  #     ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+  #     ARM_TENANT_ID:       ${{ secrets.AZURE_TENANT_ID }}
+  #     ARM_USE_OIDC:        "true"
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: azure/login@v2
+  #       with:
+  #         client-id:       ${{ secrets.AZURE_CLIENT_ID }}
+  #         tenant-id:       ${{ secrets.AZURE_TENANT_ID }}
+  #         subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+  #     - uses: hashicorp/setup-terraform@v3
+  #       with:
+  #         terraform_version: "~> 1.7"
+  #     - name: terraform plan
+  #       run: |
+  #         for d in infra/*/; do
+  #           (cd "$d" && terraform init && terraform plan -input=false -no-color)
+  #         done
+'@ | Set-Content -Path (Join-Path $RepoPath '.github/workflows/terraform.yml') -Encoding utf8
 
     # Aggregated coverage doc
     $skippedLines = New-Object System.Collections.Generic.List[string]
