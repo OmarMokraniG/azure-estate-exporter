@@ -1,7 +1,7 @@
 {
   "name": "azure-estate-exporter-web",
   "private": true,
-  "version": "0.5.1",
+  "version": "0.6.0",
   "type": "module",
   "description": "Visual web companion for azure-estate-exporter. Sign in with Entra, browse subscriptions/RGs, see an interactive Azure resource map and grab a Terraform CLI handoff.",
   "scripts": {
@@ -18,8 +18,10 @@
     "@tanstack/react-query": "^5.51.0",
     "@tanstack/react-table": "^8.20.0",
     "@xyflow/react": "^12.3.0",
+    "clsx": "^2.1.1",
     "dagre": "^0.8.5",
     "jszip": "^3.10.1",
+    "lucide-react": "^1.16.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "zustand": "^4.5.4"

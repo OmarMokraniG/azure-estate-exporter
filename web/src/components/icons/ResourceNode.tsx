@@ -6,9 +6,6 @@ export interface ResourceNodeData {
   resource: ArgResource;
 }
 
-// Casting NodeProps to a loose record because @xyflow/react v12's generics
-// expect a Node<...> shape that's awkward to inline; the runtime contract
-// stays the same.
 export function ResourceNode({ data }: NodeProps) {
   const { resource } = data as unknown as ResourceNodeData;
   const meta = metaForType(resource.type);
@@ -17,11 +14,11 @@ export function ResourceNode({ data }: NodeProps) {
 
   return (
     <div
-      className="flex w-[200px] items-center gap-2 rounded-md border border-slate-200 bg-white px-2 py-1.5 shadow-sm"
+      className="flex w-[200px] items-center gap-2 rounded-lg border border-default bg-surface px-2 py-1.5 shadow-soft"
       style={{ borderLeft: `4px solid ${color}` }}
       title={`${resource.type}\n${resource.id}`}
     >
-      <Handle type="target" position={Position.Left} className="!h-2 !w-2 !bg-slate-300" />
+      <Handle type="target" position={Position.Left} className="!h-2 !w-2 !bg-slate-400" />
       <img
         src={iconUrl}
         alt=""
@@ -33,14 +30,12 @@ export function ResourceNode({ data }: NodeProps) {
         }}
       />
       <div className="min-w-0 flex-1">
-        <div className="truncate text-xs font-semibold leading-tight text-slate-900">
-          {resource.name}
-        </div>
-        <div className="truncate text-[10px] uppercase tracking-wider text-slate-500">
+        <div className="truncate text-xs font-semibold leading-tight text-fg">{resource.name}</div>
+        <div className="truncate text-[10px] uppercase tracking-wider text-subtle">
           {meta.label}
         </div>
       </div>
-      <Handle type="source" position={Position.Right} className="!h-2 !w-2 !bg-slate-300" />
+      <Handle type="source" position={Position.Right} className="!h-2 !w-2 !bg-slate-400" />
     </div>
   );
 }
