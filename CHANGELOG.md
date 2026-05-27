@@ -3,6 +3,44 @@
 All notable changes to `azure-estate-exporter` are documented here.
 Format roughly follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.6.1] — 2026-05-27
+
+### Changed — diagrams now follow Azure Architecture Center reference style
+
+Inspired by the
+[IoT private file upload](https://learn.microsoft.com/en-us/azure/architecture/example-scenario/iot/iot-private-file-upload)
+reference architecture, the drawio diagrams are reorganised around
+**network topology** instead of resource category.
+
+- Each Resource Group is laid out as **Subscription → RG → VNet → Subnet**
+  containers. Resources sit inside the subnet they belong to, exactly
+  like the official ARC diagrams.
+- An **Edge band** at the top of each RG groups Internet-facing resources
+  (Public IPs, App Gateways, Front Door, Bastion, NAT Gateway).
+- A **Platform services band** under the network groups PaaS resources
+  with no VNet binding (Storage, Key Vault, App Service, SQL, Cosmos…).
+- **Observability** and **Other** bands at the bottom collect Log
+  Analytics / App Insights and anything uncategorised.
+- **Subnet auto-discovery**: ARG does not expose subnets as standalone
+  rows, so the renderer synthesises them from `vnet.properties.subnets[]`
+  and scans every resource's `properties` JSON to figure out which
+  subnet hosts it. VMs bubble up through their NIC to the right subnet.
+- **In-subnet / in-vnet edges suppressed** — the container nesting
+  already conveys "X lives in subnet Y", so we no longer draw those
+  edges (they were adding visual noise). Other relations (uses-storage,
+  uses-key-vault, …) still render.
+- Private endpoints get a 🔒 prefix in their label so they jump out.
+
+### Notes
+
+- TS renderer (`web/src/lib/drawioGenerator.ts`) and PowerShell renderer
+  (`Private/renderers/New-DrawioDiagram.ps1`) follow the same algorithm
+  so the .drawio file you export from the web app and the one the PS
+  module writes look identical.
+- 12/12 drawio vitest tests (4 new tests covering subnet nesting,
+  topology layout, in-subnet edge suppression, platform-services band).
+- Existing 44/44 Pester suite stays green; no module surface changes.
+
 ## [0.6.0] — 2026-05-27
 
 ### Changed — modern UI overhaul
