@@ -178,6 +178,10 @@
     try {
         $model.Access = Invoke-AccessAnalysis -RoleAssignments @($armExtras.RoleAssignments)
     } catch { Write-EstateLog "Access analysis failed: $($_.Exception.Message)" -Level Warn }
+    try {
+        $costByRes = if ($cost -and $cost.ByResource) { @($cost.ByResource) } else { @() }
+        $model.FinOps = Invoke-FinOpsAnalysis -Inventory $model.Inventory -CostByResource $costByRes
+    } catch { Write-EstateLog "FinOps analysis failed: $($_.Exception.Message)" -Level Warn }
 
     # Redaction pass.
     $safeModel = Protect-SensitiveValue -InputObject $model -NoRedact:$NoRedact
@@ -190,6 +194,7 @@
         if ($null -ne $safeModel.Policy)   { $safeModel.Policy   | ConvertTo-Json -Depth 16 | Set-Content "$runRoot/policy.json"   -Encoding utf8 }
         if ($safeModel.Exposure)           { ,@($safeModel.Exposure) | ConvertTo-Json -Depth 16 | Set-Content "$runRoot/exposure.json" -Encoding utf8 }
         if ($null -ne $safeModel.Access)   { $safeModel.Access   | ConvertTo-Json -Depth 16 | Set-Content "$runRoot/access.json"   -Encoding utf8 }
+        if ($null -ne $safeModel.FinOps)   { $safeModel.FinOps   | ConvertTo-Json -Depth 16 | Set-Content "$runRoot/finops.json"   -Encoding utf8 }
     }
 
     # --- 7. Renderers ---------------------------------------------------------
@@ -210,6 +215,12 @@
                 Write-EstateLog "Estate has $($safeModel.Inventory.Count) resources; Excalidraw is unreadable above ~300. Mermaid is recommended." -Level Warn
             }
             New-ExcalidrawDiagram -Model $safeModel -OutputPath "$runRoot/diagrams/estate.excalidraw"
+        }
+        # Always emit drawio (v0.5.0). It`s tiny and opens in app.diagrams.net.
+        try {
+            New-DrawioDiagram -Model $safeModel -OutputPath "$runRoot/diagrams/estate.drawio"
+        } catch {
+            Write-EstateLog "Drawio renderer failed: $($_.Exception.Message)" -Level Warn
         }
     }
 

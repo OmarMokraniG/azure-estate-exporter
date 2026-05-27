@@ -1,7 +1,7 @@
 {
   "name": "azure-estate-exporter-web",
   "private": true,
-  "version": "0.4.1",
+  "version": "0.5.0",
   "type": "module",
   "description": "Visual web companion for azure-estate-exporter. Sign in with Entra, browse subscriptions/RGs, see an interactive Azure resource map and grab a Terraform CLI handoff.",
   "scripts": {

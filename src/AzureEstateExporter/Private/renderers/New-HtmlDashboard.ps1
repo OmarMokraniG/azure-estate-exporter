@@ -240,6 +240,46 @@
 "@)
     }
 
+    if ($Model.FinOps) {
+        $h = $Model.FinOps.Headline
+        if ($h -and $h.potentialSavings -gt 0) {
+            $cardColour = if ($h.potentialSavings -gt 100) { 'crit' } else { 'warn' }
+            [void]$customerCards.AppendLine("    <div class='card $cardColour'><div class='v'>$($h.potentialSavings) $($h.currency)</div><div class='l'>FinOps savings (est)</div></div>")
+        }
+
+        $topRows = New-Object System.Text.StringBuilder
+        foreach ($t in $Model.FinOps.TopSpenders | Select-Object -First 10) {
+            $portal = "https://portal.azure.com/#@/resource$($t.resourceId)"
+            [void]$topRows.AppendLine("<tr><td><a href='$portal' target='_blank'>$(ConvertTo-HtmlText $t.name)</a></td><td><code>$(ConvertTo-HtmlText $t.type)</code></td><td><code>$(ConvertTo-HtmlText $t.resourceGroup)</code></td><td class='num'>$($t.cost) $(ConvertTo-HtmlText $t.currency)</td></tr>")
+        }
+        $mixRows = New-Object System.Text.StringBuilder
+        foreach ($m in $Model.FinOps.ServiceMix | Select-Object -First 10) {
+            [void]$mixRows.AppendLine("<tr><td><code>$(ConvertTo-HtmlText $m.serviceType)</code></td><td class='num'>$($m.resourceCount)</td><td class='num'>$($m.totalCost)</td><td class='num'>$($m.percentOfTotal)%</td></tr>")
+        }
+        $finOpsRows = New-Object System.Text.StringBuilder
+        foreach ($f in $Model.FinOps.Findings) {
+            $sevClass = "sev-$($f.severity)".ToLower()
+            $portal = if ($f.resourceId) { "<a href='https://portal.azure.com/#@/resource$($f.resourceId)' target='_blank'>$(ConvertTo-HtmlText $f.resourceName)</a>" } else { '<em>—</em>' }
+            $savings = if ($f.estimatedMonthlySavings -gt 0) { "$($f.estimatedMonthlySavings) $(ConvertTo-HtmlText $f.currency)" } else { '—' }
+            [void]$finOpsRows.AppendLine("<tr><td><span class='pill $sevClass'>$(ConvertTo-HtmlText $f.severity)</span></td><td>$(ConvertTo-HtmlText $f.title)</td><td>$portal</td><td class='num'>$savings</td><td>$(ConvertTo-HtmlText $f.recommendation)</td></tr>")
+        }
+
+        if ($topRows.Length -gt 0 -or $finOpsRows.Length -gt 0) {
+            [void]$customerSections.AppendLine(@"
+<section>
+  <h2>FinOps</h2>
+  <p style="color:#6a7388; font-size:12px; margin-top:-4px;">Where the money goes (top resources) and recommendations. Savings figures are best-effort estimates — verify before acting.</p>
+  <div class="columns2">
+    <div><h3>Top spenders</h3><table><thead><tr><th>Resource</th><th>Type</th><th>RG</th><th class='num'>Cost</th></tr></thead><tbody>$($topRows.ToString())</tbody></table></div>
+    <div><h3>Cost mix by service type</h3><table><thead><tr><th>Service</th><th class='num'>Resources</th><th class='num'>Cost</th><th class='num'>%</th></tr></thead><tbody>$($mixRows.ToString())</tbody></table></div>
+  </div>
+  <h3 style="margin-top:14px;">Recommendations</h3>
+  <table><thead><tr><th>Severity</th><th>Finding</th><th>Resource</th><th class='num'>Est. savings/mo</th><th>Recommendation</th></tr></thead><tbody>$($finOpsRows.ToString())</tbody></table>
+</section>
+"@)
+        }
+    }
+
     $html = @"
 <!doctype html>
 <html lang="en">
