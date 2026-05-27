@@ -3,6 +3,61 @@
 All notable changes to `azure-estate-exporter` are documented here.
 Format roughly follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.5.0] — 2026-05-27
+
+### Added
+
+- **drawio (diagrams.net) diagram renderer** (`Private/renderers/New-DrawioDiagram.ps1`).
+  Every run emits `diagrams/estate.drawio` with the diagrams.net Azure shape
+  library (`mxgraph.azure.*`). Containers nest subscription → resource group →
+  resources; labelled edges come from the same inferred graph the Mermaid
+  renderer uses. Opens in **app.diagrams.net**, **VS Code Draw.io Integration**,
+  or **Draw.io Desktop** without any extra install.
+- **Per-resource cost** in the cost collector — `Invoke-CostCollector` now
+  issues a second Cost Management query grouped by `ResourceId` (besides the
+  existing RG + ServiceName one). Surfaces as `Model.Cost.ByResource` and
+  `out/<timestamp>/cost.json`.
+- **FinOps analyser** (`Private/analysis/Invoke-FinOpsAnalysis.ps1`) — 7 rules
+  derived from inventory + cost, no extra Azure calls:
+  1. Unattached managed disks
+  2. Unattached Public IPs
+  3. App Service plans with no hosted sites
+  4. GRS/RAGRS storage on dev/test RGs
+  5. Premium / Ultra disks under 256 GB (StandardSSD candidate)
+  6. Oversized VMs (D/E/M-series ≥ 32 vCPU)
+  7. Classic App Insights (no workspace) — migration recommendation
+  Output: severity-graded findings + best-effort `estimatedMonthlySavings`
+  + top spenders + service mix. Written to `out/<timestamp>/finops.json`.
+- **FinOps section** added to the Markdown report and the HTML dashboard
+  (headline KPI card with potential savings, top-spenders table, cost mix by
+  service type, recommendations table).
+- **Web app — Resources tab** rewritten with FinOps surface:
+  - 4 KPI cards (Total MTD, Potential savings, Findings count, Top spender).
+  - Recommendations list with severity pills and clickable resource links.
+  - Cost mix by service type with inline bar gauge.
+  - Top 10 spenders table.
+  - New **Cost (MTD)** column in the resources table, sortable.
+  - One Cost Management query per scope, 30 min staleTime.
+- **Web app — Diagram tab** gets:
+  - **Export as drawio** button — downloads `.drawio` XML built client-side
+    by `web/src/lib/drawioGenerator.ts` (TS port of the PS renderer).
+  - **Open diagrams.net ↗** link.
+- 15 new tests (8 drawio + 7 FinOps).
+
+### Changed
+
+- `ConvertTo-EstateModel` now exposes a `FinOps` slot on the model (null
+  when analysis is skipped or fails).
+
+### Notes
+
+- The FinOps analyser is honest about uncertainty — every `estimatedMonthlySavings`
+  is a heuristic and the UI says so. The PowerShell module and the web app share
+  the same rule set (the TS file is a port; both render identical findings for
+  the same inputs).
+- drawio shape library is the bundled `mxgraph.azure` set, which renders in
+  diagrams.net without installing Microsoft's official icons.
+
 ## [0.4.1] — 2026-05-26
 
 ### Added

@@ -49,6 +49,7 @@
     $result = [pscustomobject]@{
         ByResourceGroup    = New-Object System.Collections.ArrayList
         ByService          = New-Object System.Collections.ArrayList
+        ByResource         = New-Object System.Collections.ArrayList
         Totals             = New-Object System.Collections.ArrayList
         SubscriptionStatus = New-Object System.Collections.ArrayList
         Timeframe          = $Timeframe
@@ -165,6 +166,49 @@
         [void]$result.SubscriptionStatus.Add([pscustomobject]@{
             subscriptionId = $sub; status = 'ok'; message = "$($rows.Count) row(s)"
         })
+
+        # --- 2nd query: by ResourceId — gives per-resource attribution -----
+        # Surface as best-effort: a failure here doesn`t invalidate the RG/service
+        # data we already have.
+        $bodyResource = @{
+            type      = 'Usage'
+            timeframe = $Timeframe
+            dataset   = @{
+                granularity = 'None'
+                aggregation = @{ totalCost = @{ name = 'Cost'; function = 'Sum' } }
+                grouping    = @(@{ type = 'Dimension'; name = 'ResourceId' })
+            }
+        } | ConvertTo-Json -Depth 8 -Compress
+        $resBody = New-TemporaryFile
+        try {
+            Set-Content -Path $resBody.FullName -Value $bodyResource -Encoding ascii -NoNewline
+            $rawR = & az rest --method post --uri $uri --headers 'Content-Type=application/json' --body "@$($resBody.FullName)" 2>&1
+            if ($LASTEXITCODE -eq 0) {
+                $respR = $rawR | ConvertFrom-Json -Depth 32
+                $colsR = @{}
+                if ($respR.properties.columns) {
+                    for ($i = 0; $i -lt $respR.properties.columns.Count; $i++) {
+                        $colsR[$respR.properties.columns[$i].name] = $i
+                    }
+                }
+                foreach ($row in @($respR.properties.rows)) {
+                    $rid = [string]$row[$colsR['ResourceId']]
+                    if (-not $rid) { continue }
+                    [void]$result.ByResource.Add([pscustomobject]@{
+                        subscriptionId = $sub
+                        resourceId     = $rid
+                        cost           = [math]::Round([double]$row[$colsR['Cost']], 2)
+                        currency       = [string]$row[$colsR['Currency']]
+                    })
+                }
+            } else {
+                [void]$Errors.Add([pscustomobject]@{
+                    area = 'costByResource'; scope = "/subscriptions/$sub"
+                    error = (($rawR | Out-String).Trim()).Substring(0, [Math]::Min(300, ($rawR | Out-String).Length))
+                })
+            }
+        }
+        finally { Remove-Item -Path $resBody.FullName -ErrorAction SilentlyContinue }
     }
 
     return $result

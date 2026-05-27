@@ -1,6 +1,6 @@
 @{
     RootModule        = 'AzureEstateExporter.psm1'
-    ModuleVersion     = '0.4.0'
+    ModuleVersion     = '0.5.0'
     GUID              = 'a4f4f6c8-3b3a-4b5a-9f4c-1d2e3f4a5b6c'
     Author            = 'Omar Mokrani and contributors'
     CompanyName       = 'Community'

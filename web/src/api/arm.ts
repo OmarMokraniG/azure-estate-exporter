@@ -132,3 +132,57 @@ export async function countByResourceGroup(
   type Row = { resourceGroup: string; count: number };
   return argQuery<Row>(kql, [subscriptionId]);
 }
+
+export interface ResourceCost {
+  resourceId: string;
+  cost: number;
+  currency: string;
+}
+
+/**
+ * Fetch per-resource cost from Cost Management for the given scope.
+ * One POST per subscription, grouped by `ResourceId`, timeframe MonthToDate.
+ * Returns empty array on auth/throttle failures so the UI can degrade
+ * gracefully — the caller surfaces a banner.
+ */
+export async function costByResource(
+  subscriptionId: string,
+  timeframe: 'MonthToDate' | 'TheLastMonth' = 'MonthToDate',
+): Promise<ResourceCost[]> {
+  const body = {
+    type: 'Usage',
+    timeframe,
+    dataset: {
+      granularity: 'None',
+      aggregation: { totalCost: { name: 'Cost', function: 'Sum' } },
+      grouping: [{ type: 'Dimension', name: 'ResourceId' }],
+    },
+  };
+  type Resp = {
+    properties?: {
+      columns?: { name: string; type: string }[];
+      rows?: unknown[][];
+    };
+  };
+  try {
+    const r = await armFetch<Resp>(
+      `/subscriptions/${subscriptionId}/providers/Microsoft.CostManagement/query?api-version=2023-11-01`,
+      { method: 'POST', body: JSON.stringify(body) },
+    );
+    const cols = r.properties?.columns ?? [];
+    const rows = r.properties?.rows ?? [];
+    const idx = (name: string) => cols.findIndex((c) => c.name === name);
+    const iCost = idx('Cost');
+    const iId = idx('ResourceId');
+    const iCur = idx('Currency');
+    return rows
+      .map((row) => ({
+        resourceId: String(row[iId] ?? ''),
+        cost: Number(row[iCost] ?? 0),
+        currency: String(row[iCur] ?? 'USD'),
+      }))
+      .filter((r) => r.resourceId.length > 0);
+  } catch {
+    return [];
+  }
+}

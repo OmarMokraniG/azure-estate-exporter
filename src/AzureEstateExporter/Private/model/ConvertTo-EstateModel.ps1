@@ -207,5 +207,6 @@
         Policy    = $null
         Exposure  = @()
         Access    = $null
+        FinOps    = $null
     }
 }

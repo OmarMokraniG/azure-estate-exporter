@@ -202,6 +202,61 @@
         }
     }
 
+    if ($Model.FinOps) {
+        $h = $Model.FinOps.Headline
+        [void]$sb.AppendLine('## FinOps')
+        [void]$sb.AppendLine()
+        if ($h -and $h.totalMonthlyCost) {
+            [void]$sb.AppendLine("- **Total this period**: $($h.totalMonthlyCost) $($h.currency)")
+        }
+        if ($h -and $h.potentialSavings -gt 0) {
+            [void]$sb.AppendLine("- **Potential savings identified**: $($h.potentialSavings) $($h.currency)/month (best-effort estimate)")
+        }
+        if ($h -and $h.findingCount -gt 0) {
+            $sevSummary = ($h.findingsBySeverity | ForEach-Object { "**$($_.severity)**: $($_.count)" }) -join '  ·  '
+            [void]$sb.AppendLine("- **Findings**: $($h.findingCount) — $sevSummary")
+        }
+        [void]$sb.AppendLine()
+
+        if ($Model.FinOps.TopSpenders -and $Model.FinOps.TopSpenders.Count -gt 0) {
+            [void]$sb.AppendLine('### Where the money goes')
+            [void]$sb.AppendLine()
+            [void]$sb.AppendLine('| # | Resource | Type | RG | Cost |')
+            [void]$sb.AppendLine('|---:|----------|------|----|-----:|')
+            $i = 1
+            foreach ($t in $Model.FinOps.TopSpenders | Select-Object -First 10) {
+                [void]$sb.AppendLine("| $i | ``$($t.name)`` | ``$($t.type)`` | ``$($t.resourceGroup)`` | $($t.cost) $($t.currency) |")
+                $i++
+            }
+            [void]$sb.AppendLine()
+        }
+
+        if ($Model.FinOps.ServiceMix -and $Model.FinOps.ServiceMix.Count -gt 0) {
+            [void]$sb.AppendLine('### Cost mix by service type')
+            [void]$sb.AppendLine()
+            [void]$sb.AppendLine('| Service type | Resources | Cost | % of total |')
+            [void]$sb.AppendLine('|--------------|----------:|-----:|-----------:|')
+            foreach ($m in $Model.FinOps.ServiceMix | Select-Object -First 15) {
+                [void]$sb.AppendLine("| ``$($m.serviceType)`` | $($m.resourceCount) | $($m.totalCost) | $($m.percentOfTotal)% |")
+            }
+            [void]$sb.AppendLine()
+        }
+
+        if ($Model.FinOps.Findings -and $Model.FinOps.Findings.Count -gt 0) {
+            [void]$sb.AppendLine('### Recommendations')
+            [void]$sb.AppendLine()
+            [void]$sb.AppendLine('| Severity | Title | Estimated savings (mo) | Recommendation |')
+            [void]$sb.AppendLine('|----------|-------|----------------------:|----------------|')
+            foreach ($f in $Model.FinOps.Findings) {
+                $savings = if ($f.estimatedMonthlySavings -gt 0) { "$($f.estimatedMonthlySavings) $($f.currency)" } else { '—' }
+                [void]$sb.AppendLine("| **$($f.severity)** | $($f.title) | $savings | $($f.recommendation) |")
+            }
+            [void]$sb.AppendLine()
+            [void]$sb.AppendLine('> _Savings figures are best-effort estimates — review per-resource before acting._')
+            [void]$sb.AppendLine()
+        }
+    }
+
     if ($PSCmdlet.ShouldProcess($OutputPath, 'Write Markdown report')) {
         $dir = Split-Path -Parent $OutputPath
         if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Force -Path $dir | Out-Null }
