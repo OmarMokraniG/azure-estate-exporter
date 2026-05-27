@@ -107,6 +107,67 @@ Describe 'New-AzureEstateTerraformRepo' {
         { New-AzureEstateTerraformRepo -InputPath $script:exportRoot -OutputPath $script:outputRepo } |
             Should -Throw
     }
+
+    It 'emits terraform.tf with required_version + pinned azurerm provider' {
+        $tf = Get-Content (Join-Path $script:outputRepo 'infra/rg-sample/terraform.tf') -Raw
+        $tf | Should -Match 'required_version\s*=\s*">= 1\.5\.0"'
+        $tf | Should -Match 'azurerm\s*=\s*\{[\s\S]*?version\s*=\s*"4\.58\.0"'
+    }
+
+    It 'emits a locals.tf with a common_tags merge expression' {
+        $tfLocals = Get-Content (Join-Path $script:outputRepo 'infra/rg-sample/locals.tf') -Raw
+        $tfLocals | Should -Match 'common_tags'
+        $tfLocals | Should -Match 'merge\('
+        $tfLocals | Should -Match 'managed-by'
+    }
+
+    It 'declares environment + owner + additional_tags variables with descriptions' {
+        $vars = Get-Content (Join-Path $script:outputRepo 'infra/rg-sample/variables.tf') -Raw
+        $vars | Should -Match 'variable\s+"environment"'
+        $vars | Should -Match 'variable\s+"owner"'
+        $vars | Should -Match 'variable\s+"additional_tags"'
+        $vars | Should -Match 'description\s*='
+    }
+
+    It 'ships customer-grade root scaffolding files' {
+        Test-Path (Join-Path $script:outputRepo '.editorconfig')                   | Should -BeTrue
+        Test-Path (Join-Path $script:outputRepo '.tflint.hcl')                     | Should -BeTrue
+        Test-Path (Join-Path $script:outputRepo 'Makefile')                        | Should -BeTrue
+        Test-Path (Join-Path $script:outputRepo '.github/workflows/terraform.yml') | Should -BeTrue
+        $wf = Get-Content (Join-Path $script:outputRepo '.github/workflows/terraform.yml') -Raw
+        $wf | Should -Match 'terraform fmt -check'
+        $wf | Should -Match 'tflint'
+    }
+}
+
+Describe 'New-AzureEstateTerraformRepo with -RenameResources' {
+    BeforeAll {
+        $script:renameExport = Join-Path $script:tmpRoot 'rename-export'
+        $renameTf = Join-Path $script:renameExport 'terraform'
+        Copy-Item -Path $script:fixtureRoot -Destination $renameTf -Recurse -Force
+        $script:renameRepo = Join-Path $script:tmpRoot 'rename-repo'
+        New-AzureEstateTerraformRepo -InputPath $script:renameExport -OutputPath $script:renameRepo -RenameResources -Force | Out-Null
+    }
+
+    It 'replaces res-N resource block names with meaningful sanitised Azure names' {
+        $main = Get-Content (Join-Path $script:renameRepo 'infra/rg-sample/main.tf') -Raw
+        $main | Should -Match 'resource\s+"azurerm_resource_group"\s+"rg_sample"'
+        $main | Should -Match 'resource\s+"azurerm_storage_account"\s+"stsample0001"'
+        $main | Should -Not -Match 'resource\s+"[^"]+"\s+"res-\d+"'
+    }
+
+    It 'rewrites resource_group_name references to use the new name' {
+        $main = Get-Content (Join-Path $script:renameRepo 'infra/rg-sample/main.tf') -Raw
+        $main | Should -Match 'resource_group_name\s*=\s*azurerm_resource_group\.rg_sample\.name'
+        $main | Should -Not -Match 'azurerm_resource_group\.res-0'
+    }
+
+    It 'updates the bootstrap-import.ps1 with the renamed addresses' {
+        $bs = Get-Content (Join-Path $script:renameRepo 'infra/rg-sample/bootstrap-import.ps1') -Raw
+        $bs | Should -Match "Invoke-Import\s+-Address\s+'azurerm_resource_group\.rg_sample'"
+        $bs | Should -Match "Invoke-Import\s+-Address\s+'azurerm_storage_account\.stsample0001'"
+        $bs | Should -Not -Match 'res-\d+'
+    }
 }
 
 Describe 'New-AzureEstateTerraformRepo edge cases' {

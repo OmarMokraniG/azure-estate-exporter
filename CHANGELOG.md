@@ -3,6 +3,64 @@
 All notable changes to `azure-estate-exporter` are documented here.
 Format roughly follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.5.1] — 2026-05-27
+
+### Fixed
+
+- **Drawio diagram now actually renders**. v0.5.0 referenced
+  `mxgraph.azure.*` stencil names which are NOT in the diagrams.net
+  default shape library (they live in the Microsoft MSCAE stencil that
+  has to be enabled by hand) — the file opened to blank squares. v0.5.1
+  embeds each icon as a base64 SVG data URI in a
+  `shape=image;image=data:image/svg+xml;base64,...` style, making the
+  file self-contained. It renders the same in app.diagrams.net, VS Code
+  Draw.io Integration and Draw.io Desktop without any extra setup.
+- The 33 hand-drawn SVG icons are now shipped under
+  `src/AzureEstateExporter/Assets/icons/` so the PowerShell renderer has
+  access to them at runtime. The web app keeps loading from `/icons/`.
+
+### Added
+
+- **Drawio Azure reference-architecture layout** — resources are placed
+  into category bands:
+  1. Internet / Edge (Public IPs, Front Door, App Gateway, Load Balancer, APIM)
+  2. Network (VNet, Subnet, NIC, NSG, Route Table, Private Endpoint)
+  3. Compute & Web (VM, VMSS, AKS, ACR, App Service, App Service Plan)
+  4. Data & Security (Disks, Storage, SQL, Cosmos, Redis, Key Vault, MI)
+  5. Observability & Integration (App Insights, Log Analytics, Event Grid/Hub, SB)
+  Bands are coloured + bordered for visual scanning. Edges use bezier
+  curves with white-background labels for readability across containers.
+- **`-RenameResources` switch** on `New-AzureEstateTerraformRepo`. Renames
+  `res-0`, `res-1`, ... to meaningful Terraform addresses derived from
+  the actual Azure resource name (for example,
+  `azurerm_storage_account.stcontoso` instead of
+  `azurerm_storage_account.res-12`). Rewrites resource declarations and
+  references in `main.tf`, the `terraform import` calls in
+  `bootstrap-import.ps1`, and the entries in `imports.md`. Recommended
+  for customers adopting Terraform as the foundation of a DevOps practice.
+- **Terraform best-practice scaffolding** in every packaged repo:
+  - `terraform.tf` with `required_version = ">= 1.5.0"` and the `azurerm`
+    provider pinned to the version aztfexport produced the HCL with.
+  - `locals.tf` with a `common_tags` merge expression.
+  - `variables.tf` with `subscription_id` (with regex validation),
+    `environment`, `owner`, `additional_tags` — every variable documented.
+  - `.editorconfig`, `.tflint.hcl` (azurerm ruleset + naming convention),
+    `Makefile` with `fmt`/`validate`/`lint`/`plan-all`/`bootstrap` targets.
+  - `.github/workflows/terraform.yml` running `terraform fmt -check`,
+    `terraform validate` per `infra/<rg>` and `tflint --recursive`. A
+    commented-out plan job is included for when the user wires OIDC.
+- 7 new Pester tests covering the new scaffolding + the rename pipeline.
+
+### Notes
+
+- `-RenameResources` is opt-in. The default behaviour (`Export-AzureEstate`
+  auto-packaging without the switch) keeps `res-N` names so existing
+  Terraform docs that reference them still match.
+- The packager`s mapping-parsing step moved earlier in the loop so
+  `outputs.tf` correctly receives the per-RG mapping (a stale-state bug
+  in v0.5.0 caused `outputs.tf` to be missed on the first RG of multi-RG
+  runs). Fixed.
+
 ## [0.5.0] — 2026-05-27
 
 ### Added
