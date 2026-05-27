@@ -26,8 +26,8 @@ Format roughly follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   5. Premium / Ultra disks under 256 GB (StandardSSD candidate)
   6. Oversized VMs (D/E/M-series ≥ 32 vCPU)
   7. Classic App Insights (no workspace) — migration recommendation
-  Output: severity-graded findings + best-effort `estimatedMonthlySavings`
-  + top spenders + service mix. Written to `out/<timestamp>/finops.json`.
+  Output: severity-graded findings, best-effort `estimatedMonthlySavings`,
+  top spenders, and a service-mix breakdown. Written to `out/<timestamp>/finops.json`.
 - **FinOps section** added to the Markdown report and the HTML dashboard
   (headline KPI card with potential savings, top-spenders table, cost mix by
   service type, recommendations table).
